@@ -2,6 +2,7 @@
 
 #include "fem/elements/Beam3D.hpp"
 #include "fem/loads/BeamElementLoad3D.hpp"
+#include "fem/response/BeamSectionStressRecovery.hpp"
 
 #include <Eigen/Geometry>
 
@@ -305,6 +306,69 @@ BeamSectionForces Model::beamSectionForces(
       section_moment.x(),
       section_moment.y(),
       section_moment.z()};
+}
+
+double Model::beamNormalStressAt(
+    ElementId element_id,
+    double x,
+    double y,
+    double z,
+    const Eigen::VectorXd& global_displacement,
+    double time,
+    BeamSectionSide side) const {
+  const Element& target = element(element_id);
+  const auto* beam = dynamic_cast<const Beam3D*>(&target);
+  if (beam == nullptr) {
+    throw std::invalid_argument(
+        "beamNormalStressAt requires a Beam3D element");
+  }
+
+  const BeamSectionForces forces =
+      beamSectionForces(
+          element_id, x, global_displacement, time, side);
+  return BeamSectionStressRecovery{}.normalStressAt(
+      beam->section(), forces, y, z);
+}
+
+BeamSectionStress Model::beamStressAt(
+    ElementId element_id,
+    double x,
+    double y,
+    double z,
+    const Eigen::VectorXd& global_displacement,
+    double time,
+    BeamSectionSide side) const {
+  const Element& target = element(element_id);
+  const auto* beam = dynamic_cast<const Beam3D*>(&target);
+  if (beam == nullptr) {
+    throw std::invalid_argument("beamStressAt requires a Beam3D element");
+  }
+
+  const BeamSectionForces forces =
+      beamSectionForces(
+          element_id, x, global_displacement, time, side);
+  return BeamSectionStressRecovery{}.stressAt(
+      beam->section(), forces, y, z);
+}
+
+BeamNormalStressExtrema Model::beamNormalStressExtrema(
+    ElementId element_id,
+    double x,
+    const Eigen::VectorXd& global_displacement,
+    double time,
+    BeamSectionSide side) const {
+  const Element& target = element(element_id);
+  const auto* beam = dynamic_cast<const Beam3D*>(&target);
+  if (beam == nullptr) {
+    throw std::invalid_argument(
+        "beamNormalStressExtrema requires a Beam3D element");
+  }
+
+  const BeamSectionForces forces =
+      beamSectionForces(
+          element_id, x, global_displacement, time, side);
+  return BeamSectionStressRecovery{}.normalStressExtrema(
+      beam->section(), forces);
 }
 
 }  // namespace fem

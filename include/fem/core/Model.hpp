@@ -8,6 +8,7 @@
 #include "fem/core/Types.hpp"
 #include "fem/loads/TimeDependentElementLoad.hpp"
 #include "fem/response/BeamSectionForces.hpp"
+#include "fem/response/BeamSectionStress.hpp"
 
 #include <Eigen/Core>
 
@@ -93,6 +94,31 @@ class Model {
 
   std::vector<ElementLoadSamplingLocation> elementLoadSampleLocations(
       ElementId element_id) const;
+
+  double beamNormalStressAt(
+      ElementId element_id,
+      double x,
+      double y,
+      double z,
+      const Eigen::VectorXd& global_displacement,
+      double time = 0.0,
+      BeamSectionSide side = BeamSectionSide::Right) const;
+
+  BeamSectionStress beamStressAt(
+      ElementId element_id,
+      double x,
+      double y,
+      double z,
+      const Eigen::VectorXd& global_displacement,
+      double time = 0.0,
+      BeamSectionSide side = BeamSectionSide::Right) const;
+
+  BeamNormalStressExtrema beamNormalStressExtrema(
+      ElementId element_id,
+      double x,
+      const Eigen::VectorXd& global_displacement,
+      double time = 0.0,
+      BeamSectionSide side = BeamSectionSide::Right) const;
 
   const std::unordered_map<NodeId, Node>& nodes() const noexcept { return nodes_; }
 

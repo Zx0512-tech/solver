@@ -46,6 +46,7 @@ add_library(solver_core
   src/loads/TimeDependentElementLoad.cpp
   src/recorder/ElementRecorder.cpp
   src/response/BeamResponseSampler.cpp
+  src/response/BeamSectionStressRecovery.cpp
   src/solver/LinearStaticSolver.cpp
   src/solver/ModalSolver.cpp
   src/solver/NewmarkBetaSolver.cpp
@@ -69,6 +70,9 @@ if(SOLVER_BUILD_EXAMPLES)
 
   add_executable(beam_force_diagrams_example examples/beam_force_diagrams.cpp)
   target_link_libraries(beam_force_diagrams_example PRIVATE solver::core)
+
+  add_executable(beam_stress_recovery_example examples/beam_stress_recovery.cpp)
+  target_link_libraries(beam_stress_recovery_example PRIVATE solver::core)
 endif()
 
 if(SOLVER_BUILD_TESTS)
@@ -105,4 +109,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_beam_force_output tests/test_beam_force_output.cpp)
   target_link_libraries(test_beam_force_output PRIVATE solver::core)
   add_test(NAME beam_force_output COMMAND test_beam_force_output)
+
+  add_executable(test_section_stress tests/test_section_stress.cpp)
+  target_link_libraries(test_section_stress PRIVATE solver::core)
+  add_test(NAME section_stress COMMAND test_section_stress)
 endif()

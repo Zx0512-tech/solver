@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(solver VERSION 0.1.0 LANGUAGES CXX)
+project(solver VERSION 0.2.0 LANGUAGES CXX)
 
 option(SOLVER_BUILD_TESTS "Build solver tests" ON)
 option(SOLVER_BUILD_EXAMPLES "Build solver examples" ON)
@@ -35,8 +35,11 @@ endif()
 add_library(solver_core
   src/core/DofManager.cpp
   src/core/Model.cpp
+  src/dynamics/RayleighDamping.cpp
   src/elements/Beam3D.cpp
   src/solver/LinearStaticSolver.cpp
+  src/solver/ModalSolver.cpp
+  src/solver/NewmarkBetaSolver.cpp
 )
 add_library(solver::core ALIAS solver_core)
 
@@ -51,11 +54,19 @@ target_compile_options(solver_core PRIVATE
 if(SOLVER_BUILD_EXAMPLES)
   add_executable(cantilever_example examples/cantilever.cpp)
   target_link_libraries(cantilever_example PRIVATE solver::core)
+
+  add_executable(dynamic_cantilever_example examples/dynamic_cantilever.cpp)
+  target_link_libraries(dynamic_cantilever_example PRIVATE solver::core)
 endif()
 
 if(SOLVER_BUILD_TESTS)
   enable_testing()
+
   add_executable(test_beam3d tests/test_beam3d.cpp)
   target_link_libraries(test_beam3d PRIVATE solver::core)
   add_test(NAME beam3d COMMAND test_beam3d)
+
+  add_executable(test_dynamics tests/test_dynamics.cpp)
+  target_link_libraries(test_dynamics PRIVATE solver::core)
+  add_test(NAME dynamics COMMAND test_dynamics)
 endif()

@@ -3,7 +3,8 @@
 #include <Eigen/Cholesky>
 
 #include <cmath>
-#include <stdexcept>\n#include <string>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace fem {

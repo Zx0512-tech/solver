@@ -105,4 +105,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_beam_force_output tests/test_beam_force_output.cpp)
   target_link_libraries(test_beam_force_output PRIVATE solver::core)
   add_test(NAME beam_force_output COMMAND test_beam_force_output)
+
+  add_executable(test_section_stress tests/test_section_stress.cpp)
+  target_link_libraries(test_section_stress PRIVATE solver::core)
+  add_test(NAME section_stress COMMAND test_section_stress)
 endif()

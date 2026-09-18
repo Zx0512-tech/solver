@@ -1,5 +1,8 @@
 #include "fem/dynamics/RayleighDamping.hpp"
 
+#include <Eigen/LU>
+
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
@@ -29,7 +32,7 @@ RayleighDamping RayleighDamping::fromModalTargets(double omega_1,
   Eigen::Matrix2d a;
   a << 1.0 / (2.0 * omega_1), omega_1 / 2.0,
        1.0 / (2.0 * omega_2), omega_2 / 2.0;
-  Eigen::Vector2d zeta(damping_ratio_1, damping_ratio_2);
+  const Eigen::Vector2d zeta(damping_ratio_1, damping_ratio_2);
   const Eigen::Vector2d coefficients = a.fullPivLu().solve(zeta);
 
   return {coefficients[0], coefficients[1]};

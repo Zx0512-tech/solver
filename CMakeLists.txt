@@ -113,4 +113,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_section_stress tests/test_section_stress.cpp)
   target_link_libraries(test_section_stress PRIVATE solver::core)
   add_test(NAME section_stress COMMAND test_section_stress)
+
+  add_executable(test_result_recorders tests/test_result_recorders.cpp)
+  target_link_libraries(test_result_recorders PRIVATE solver::core)
+  add_test(NAME result_recorders COMMAND test_result_recorders)
 endif()

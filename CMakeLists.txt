@@ -3,6 +3,7 @@ project(solver VERSION 0.2.0 LANGUAGES CXX)
 
 option(SOLVER_BUILD_TESTS "Build solver tests" ON)
 option(SOLVER_BUILD_EXAMPLES "Build solver examples" ON)
+option(SOLVER_BUILD_BENCHMARKS "Build solver performance benchmarks" ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -82,6 +83,11 @@ if(SOLVER_BUILD_EXAMPLES)
   target_link_libraries(result_envelope_example PRIVATE solver::core)
 endif()
 
+if(SOLVER_BUILD_BENCHMARKS)
+  add_executable(solver_benchmark benchmarks/solver_benchmark.cpp)
+  target_link_libraries(solver_benchmark PRIVATE solver::core)
+endif()
+
 if(SOLVER_BUILD_TESTS)
   enable_testing()
 
@@ -132,4 +138,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_sparse_solvers tests/test_sparse_solvers.cpp)
   target_link_libraries(test_sparse_solvers PRIVATE solver::core)
   add_test(NAME sparse_solvers COMMAND test_sparse_solvers)
+
+  add_executable(test_v1_verification tests/test_v1_verification.cpp)
+  target_link_libraries(test_v1_verification PRIVATE solver::core)
+  add_test(NAME v1_verification COMMAND test_v1_verification)
 endif()

@@ -45,6 +45,9 @@ add_library(solver_core
   src/loads/BeamUniformLoad3D.cpp
   src/loads/TimeDependentElementLoad.cpp
   src/recorder/ElementRecorder.cpp
+  src/recorder/EnvelopeRecorder.cpp
+  src/recorder/NodeRecorder.cpp
+  src/recorder/SectionRecorder.cpp
   src/response/BeamResponseSampler.cpp
   src/response/BeamSectionStressRecovery.cpp
   src/solver/LinearStaticSolver.cpp

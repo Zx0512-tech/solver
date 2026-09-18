@@ -12,7 +12,7 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
       - name: Test
-        run: ctest --test-dir build --output-on-failure -R '^(beam3d|dynamics|element_response|beam_loads|partial_beam_loads|time_element_loads|beam_section_forces|beam_force_output|section_stress|result_recorders|sparse_assembly|sparse_solvers|v1_verification)$'
+        run: ctest --test-dir build --output-on-failure -R '^(beam3d|dynamics|element_response|beam_loads|partial_beam_loads|time_element_loads|beam_section_forces|beam_force_output|section_stress|result_recorders|sparse_assembly|sparse_solvers|v1_verification|sparse_modal)$'
       - name: V1 verification report
         run: ./build/test_v1_verification
       - name: Performance benchmark

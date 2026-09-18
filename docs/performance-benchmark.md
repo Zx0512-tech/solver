@@ -182,6 +182,12 @@ GitHub Hosted Runner 的绝对毫秒数不应视为固定性能承诺。
 
 ## 模态分析说明
 
-当前 v1.0 模态约化特征值问题仍采用稠密求解，因此没有把大规模模态分析纳入稀疏性能 benchmark。
+生产 `ModalSolver` 已采用稀疏 `Kff/Mff` 与 Shift-Invert Lanczos 求解低阶广义特征值。
 
-模态正确性由 v1.0 Verification Suite 单独验证。
+当前 `solver_benchmark` 可执行程序仍主要测量：
+
+- 稀疏总体组装
+- 稀疏静力求解
+- 稀疏 Newmark 瞬态求解
+
+模态正确性和稀疏求解路径由 `v1_verification` 与 `sparse_modal` 测试覆盖；其中 `sparse_modal` 会将低阶 Lanczos 结果与小规模 dense 参考解交叉验证。

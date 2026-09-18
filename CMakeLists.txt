@@ -33,6 +33,19 @@ if(NOT Eigen3_FOUND)
   endif()
 endif()
 
+find_package(Spectra 1.2 QUIET)
+if(NOT TARGET Spectra::Spectra)
+  FetchContent_Declare(
+    spectra
+    URL https://github.com/yixuan/spectra/archive/refs/tags/v1.2.0.tar.gz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  )
+  FetchContent_MakeAvailable(spectra)
+  if(TARGET Spectra AND NOT TARGET Spectra::Spectra)
+    add_library(Spectra::Spectra ALIAS Spectra)
+  endif()
+endif()
+
 add_library(solver_core
   src/core/DofManager.cpp
   src/core/Model.cpp
@@ -59,7 +72,10 @@ add_library(solver_core
 add_library(solver::core ALIAS solver_core)
 
 target_include_directories(solver_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(solver_core PUBLIC Eigen3::Eigen)
+target_link_libraries(solver_core
+  PUBLIC Eigen3::Eigen
+  PRIVATE Spectra::Spectra
+)
 
 target_compile_options(solver_core PRIVATE
   $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic;-Wconversion>
@@ -142,4 +158,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_v1_verification tests/test_v1_verification.cpp)
   target_link_libraries(test_v1_verification PRIVATE solver::core)
   add_test(NAME v1_verification COMMAND test_v1_verification)
+
+  add_executable(test_sparse_modal tests/test_sparse_modal.cpp)
+  target_link_libraries(test_sparse_modal PRIVATE solver::core)
+  add_test(NAME sparse_modal COMMAND test_sparse_modal)
 endif()

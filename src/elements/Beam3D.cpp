@@ -49,6 +49,33 @@ Eigen::MatrixXd Beam3D::mass(const NodeResolver& node) const {
   return globalMass(node);
 }
 
+ElementResponse Beam3D::response(
+    const Eigen::VectorXd& element_global_displacement,
+    const Eigen::VectorXd& element_equivalent_load_global,
+    const NodeResolver& node) const {
+  constexpr Eigen::Index kBeamDofs = 12;
+  if (element_global_displacement.size() != kBeamDofs ||
+      element_equivalent_load_global.size() != kBeamDofs) {
+    throw std::invalid_argument("Beam3D response requires 12 displacement and load values");
+  }
+
+  const Matrix12d transform = transformation(node);
+  const Eigen::Matrix<double, 12, 1> global_u = element_global_displacement;
+  const Eigen::Matrix<double, 12, 1> global_element_load =
+      element_equivalent_load_global;
+
+  const Eigen::Matrix<double, 12, 1> local_u = transform * global_u;
+  const Eigen::Matrix<double, 12, 1> local_element_load =
+      transform * global_element_load;
+
+  const Eigen::Matrix<double, 12, 1> local_force =
+      localStiffness(length(node)) * local_u - local_element_load;
+  const Eigen::Matrix<double, 12, 1> global_force =
+      transform.transpose() * local_force;
+
+  return {id(), local_u, local_force, global_force};
+}
+
 double Beam3D::length(const NodeResolver& node) const {
   const double l = (node(node_j_).coordinates() - node(node_i_).coordinates()).norm();
   if (l <= kTol) {

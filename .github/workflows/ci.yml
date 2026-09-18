@@ -12,4 +12,4 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
       - name: Test
-        run: ctest --test-dir build --output-on-failure -R '^(beam3d|dynamics)$'
+        run: ctest --test-dir build --output-on-failure -R '^(beam3d|dynamics|element_response)$'

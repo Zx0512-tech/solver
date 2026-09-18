@@ -37,6 +37,8 @@ add_library(solver_core
   src/core/Model.cpp
   src/dynamics/RayleighDamping.cpp
   src/elements/Beam3D.cpp
+  src/loads/BeamUniformLoad3D.cpp
+  src/recorder/ElementRecorder.cpp
   src/solver/LinearStaticSolver.cpp
   src/solver/ModalSolver.cpp
   src/solver/NewmarkBetaSolver.cpp
@@ -69,4 +71,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_dynamics tests/test_dynamics.cpp)
   target_link_libraries(test_dynamics PRIVATE solver::core)
   add_test(NAME dynamics COMMAND test_dynamics)
+
+  add_executable(test_element_response tests/test_element_response.cpp)
+  target_link_libraries(test_element_response PRIVATE solver::core)
+  add_test(NAME element_response COMMAND test_element_response)
 endif()

@@ -1,8 +1,47 @@
 #include "fem/core/Model.hpp"
 
+#include "fem/elements/Beam3D.hpp"
+#include "fem/loads/BeamElementLoad3D.hpp"
+
+#include <Eigen/Geometry>
+
 #include <stdexcept>
 
 namespace fem {
+namespace {
+
+BeamLoadResultant3D scaledResultant(
+    BeamLoadResultant3D result,
+    double factor) {
+  result.force *= factor;
+  result.moment *= factor;
+  return result;
+}
+
+BeamLoadResultant3D beamLoadResultantTo(
+    const ElementLoad& load,
+    const Beam3D& beam,
+    const NodeResolver& node,
+    double x,
+    double time,
+    BeamSectionSide side) {
+  if (const auto* timed =
+          dynamic_cast<const TimeDependentElementLoad*>(&load)) {
+    return scaledResultant(
+        beamLoadResultantTo(
+            timed->spatialLoad(), beam, node, x, time, side),
+        timed->scaleAt(time));
+  }
+
+  const auto* beam_load = dynamic_cast<const BeamElementLoad3D*>(&load);
+  if (beam_load == nullptr) {
+    throw std::runtime_error(
+        "Beam section-force recovery encountered an unsupported element load");
+  }
+  return beam_load->localResultantTo(beam, node, x, side);
+}
+
+}  // namespace
 
 Node& Model::addNode(NodeId id, const Eigen::Vector3d& coordinates) {
   auto [it, inserted] = nodes_.emplace(id, Node{id, coordinates});
@@ -189,6 +228,64 @@ ElementResponse Model::elementResponse(
   };
   return target.response(
       element_u, elementEquivalentLoad(element_id, time), resolver);
+}
+
+BeamSectionForces Model::beamSectionForces(
+    ElementId element_id,
+    double x,
+    const Eigen::VectorXd& global_displacement,
+    double time,
+    BeamSectionSide side) const {
+  const Element& target = element(element_id);
+  const auto* beam = dynamic_cast<const Beam3D*>(&target);
+  if (beam == nullptr) {
+    throw std::invalid_argument(
+        "beamSectionForces requires a Beam3D element");
+  }
+
+  const NodeResolver resolver = [this](NodeId id) -> const Node& {
+    return node(id);
+  };
+  const double l = beam->length(resolver);
+  if (x < 0.0 || x > l) {
+    throw std::invalid_argument(
+        "Beam section coordinate must lie in [0, L]");
+  }
+
+  const ElementResponse end_response =
+      elementResponse(element_id, global_displacement, time);
+
+  const Eigen::Vector3d initial_force =
+      -end_response.local_end_force.segment<3>(0);
+  const Eigen::Vector3d initial_moment =
+      -end_response.local_end_force.segment<3>(3);
+
+  BeamLoadResultant3D applied;
+  for (const auto& load : element_loads_) {
+    if (load->elementId() != element_id) {
+      continue;
+    }
+    const BeamLoadResultant3D contribution =
+        beamLoadResultantTo(*load, *beam, resolver, x, time, side);
+    applied.force += contribution.force;
+    applied.moment += contribution.moment;
+  }
+
+  const Eigen::Vector3d ex = Eigen::Vector3d::UnitX();
+  const Eigen::Vector3d section_force = initial_force - applied.force;
+  const Eigen::Vector3d section_moment =
+      initial_moment -
+      x * ex.cross(initial_force) -
+      applied.moment;
+
+  return {
+      x,
+      section_force.x(),
+      section_force.y(),
+      section_force.z(),
+      section_moment.x(),
+      section_moment.y(),
+      section_moment.z()};
 }
 
 }  // namespace fem

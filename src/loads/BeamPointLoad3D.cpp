@@ -2,6 +2,8 @@
 
 #include "fem/elements/Beam3D.hpp"
 
+#include <Eigen/Geometry>
+
 #include <stdexcept>
 
 namespace fem {
@@ -39,7 +41,6 @@ Eigen::VectorXd BeamPointLoad3D::equivalentNodalLoad(
   const double n3 = 3.0 * s2 - 2.0 * s3;
   const double n4 = l * (-s2 + s3);
 
-  // Derivatives of Hermite functions with respect to local x.
   const double dn1 = 6.0 * (s2 - s) / l;
   const double dn2 = 1.0 - 4.0 * s + 3.0 * s2;
   const double dn3 = 6.0 * (s - s2) / l;
@@ -48,7 +49,6 @@ Eigen::VectorXd BeamPointLoad3D::equivalentNodalLoad(
   Eigen::Matrix<double, 12, 1> local =
       Eigen::Matrix<double, 12, 1>::Zero();
 
-  // Point force.
   local[0] += (1.0 - s) * force.x();
   local[6] += s * force.x();
 
@@ -62,23 +62,58 @@ Eigen::VectorXd BeamPointLoad3D::equivalentNodalLoad(
   local[8] += n3 * force.z();
   local[10] += -n4 * force.z();
 
-  // Torsional point moment.
   local[3] += (1.0 - s) * moment.x();
   local[9] += s * moment.x();
 
-  // Point bending moment Mz performs work against theta_z = duy/dx.
   local[1] += dn1 * moment.z();
   local[5] += dn2 * moment.z();
   local[7] += dn3 * moment.z();
   local[11] += dn4 * moment.z();
 
-  // theta_y = -duz/dx under the Beam3D local sign convention.
   local[2] += -dn1 * moment.y();
   local[4] += dn2 * moment.y();
   local[8] += -dn3 * moment.y();
   local[10] += dn4 * moment.y();
 
   return transform.transpose() * local;
+}
+
+BeamLoadResultant3D BeamPointLoad3D::localResultantTo(
+    const Beam3D& beam,
+    const NodeResolver& node,
+    double x,
+    BeamSectionSide side) const {
+  const double l = beam.length(node);
+  if (distance_from_i_ < 0.0 || distance_from_i_ > l) {
+    throw std::invalid_argument(
+        "BeamPointLoad3D distance must lie between node i and node j");
+  }
+  if (x < 0.0 || x > l) {
+    throw std::invalid_argument("Beam section coordinate must lie in [0, L]");
+  }
+
+  const bool before_section = distance_from_i_ < x;
+  const bool exactly_at_section = distance_from_i_ == x;
+  if (!before_section &&
+      !(exactly_at_section && side == BeamSectionSide::Right)) {
+    return {};
+  }
+
+  Eigen::Vector3d force = force_;
+  Eigen::Vector3d moment = moment_;
+  if (coordinate_system_ == BeamLoadCoordinateSystem::Global) {
+    const Eigen::Matrix3d rotation =
+        beam.transformation(node).block<3, 3>(0, 0);
+    force = rotation * force;
+    moment = rotation * moment;
+  }
+
+  BeamLoadResultant3D result;
+  result.force = force;
+  result.moment =
+      moment +
+      (distance_from_i_ - x) * Eigen::Vector3d::UnitX().cross(force);
+  return result;
 }
 
 }  // namespace fem

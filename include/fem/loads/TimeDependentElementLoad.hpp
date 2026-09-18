@@ -10,7 +10,6 @@
 namespace fem {
 
 // Applies a scalar time history to any existing spatial ElementLoad.
-// Example: P(t) = P0 * scale(t), q(x,t) = q0(x) * scale(t).
 class TimeDependentElementLoad final : public ElementLoad {
  public:
   TimeDependentElementLoad(
@@ -18,6 +17,7 @@ class TimeDependentElementLoad final : public ElementLoad {
       std::function<double(double)> scale);
 
   const ElementLoad& spatialLoad() const noexcept { return *spatial_load_; }
+  double scaleAt(double time) const;
 
   Eigen::VectorXd equivalentNodalLoad(
       const Element& element,

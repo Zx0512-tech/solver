@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fem/core/ElementLoad.hpp"
+#include "fem/loads/BeamElementLoad3D.hpp"
 #include "fem/loads/BeamLoadCoordinateSystem.hpp"
 
 #include <Eigen/Core>
@@ -9,16 +9,14 @@ namespace fem {
 
 // Linearly varying line load over the complete Beam3D.
 // q_i and q_j are the force/length vectors at node i and node j.
-// Equal endpoints reduce exactly to a uniform load; unequal endpoints represent
-// triangular or trapezoidal loading.
-class BeamLinearLoad3D final : public ElementLoad {
+class BeamLinearLoad3D final : public BeamElementLoad3D {
  public:
   BeamLinearLoad3D(
       ElementId element_id,
       const Eigen::Vector3d& load_per_length_i,
       const Eigen::Vector3d& load_per_length_j,
       BeamLoadCoordinateSystem coordinate_system = BeamLoadCoordinateSystem::Local)
-      : ElementLoad(element_id),
+      : BeamElementLoad3D(element_id),
         load_per_length_i_(load_per_length_i),
         load_per_length_j_(load_per_length_j),
         coordinate_system_(coordinate_system) {}
@@ -30,6 +28,12 @@ class BeamLinearLoad3D final : public ElementLoad {
   Eigen::VectorXd equivalentNodalLoad(
       const Element& element,
       const NodeResolver& node) const override;
+
+  BeamLoadResultant3D localResultantTo(
+      const Beam3D& beam,
+      const NodeResolver& node,
+      double x,
+      BeamSectionSide side) const override;
 
  private:
   Eigen::Vector3d load_per_length_i_;

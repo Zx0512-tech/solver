@@ -25,6 +25,14 @@ TimeDependentElementLoad::TimeDependentElementLoad(
   }
 }
 
+double TimeDependentElementLoad::scaleAt(double time) const {
+  const double factor = scale_(time);
+  if (!std::isfinite(factor)) {
+    throw std::runtime_error("Time-dependent element-load scale must be finite");
+  }
+  return factor;
+}
+
 Eigen::VectorXd TimeDependentElementLoad::equivalentNodalLoad(
     const Element& element,
     const NodeResolver& node) const {
@@ -35,11 +43,8 @@ Eigen::VectorXd TimeDependentElementLoad::equivalentNodalLoadAt(
     const Element& element,
     const NodeResolver& node,
     double time) const {
-  const double factor = scale_(time);
-  if (!std::isfinite(factor)) {
-    throw std::runtime_error("Time-dependent element-load scale must be finite");
-  }
-  return factor * spatial_load_->equivalentNodalLoadAt(element, node, time);
+  return scaleAt(time) *
+         spatial_load_->equivalentNodalLoadAt(element, node, time);
 }
 
 }  // namespace fem

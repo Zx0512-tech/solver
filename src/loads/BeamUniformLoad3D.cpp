@@ -2,6 +2,8 @@
 
 #include "fem/elements/Beam3D.hpp"
 
+#include <Eigen/Geometry>
+
 #include <stdexcept>
 
 namespace fem {
@@ -45,6 +47,29 @@ Eigen::VectorXd BeamUniformLoad3D::equivalentNodalLoad(
   local[10] = qz * l2 / 12.0;
 
   return transform.transpose() * local;
+}
+
+BeamLoadResultant3D BeamUniformLoad3D::localResultantTo(
+    const Beam3D& beam,
+    const NodeResolver& node,
+    double x,
+    BeamSectionSide side) const {
+  (void)side;
+  const double l = beam.length(node);
+  if (x < 0.0 || x > l) {
+    throw std::invalid_argument("Beam section coordinate must lie in [0, L]");
+  }
+
+  Eigen::Vector3d q = load_per_length_;
+  if (coordinate_system_ == BeamLoadCoordinateSystem::Global) {
+    q = beam.transformation(node).block<3, 3>(0, 0) * q;
+  }
+
+  BeamLoadResultant3D result;
+  result.force = q * x;
+  result.moment =
+      -0.5 * x * x * Eigen::Vector3d::UnitX().cross(q);
+  return result;
 }
 
 }  // namespace fem

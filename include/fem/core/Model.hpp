@@ -7,6 +7,7 @@
 #include "fem/core/Node.hpp"
 #include "fem/core/Types.hpp"
 #include "fem/loads/TimeDependentElementLoad.hpp"
+#include "fem/response/BeamSectionForces.hpp"
 
 #include <Eigen/Core>
 
@@ -82,6 +83,13 @@ class Model {
       ElementId element_id,
       const Eigen::VectorXd& global_displacement,
       double time = 0.0) const;
+
+  BeamSectionForces beamSectionForces(
+      ElementId element_id,
+      double x,
+      const Eigen::VectorXd& global_displacement,
+      double time = 0.0,
+      BeamSectionSide side = BeamSectionSide::Right) const;
 
   const std::unordered_map<NodeId, Node>& nodes() const noexcept { return nodes_; }
 

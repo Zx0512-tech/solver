@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <Eigen/SparseCore>
 
 namespace fem {
 
@@ -20,6 +21,10 @@ class RayleighDamping {
 
   Eigen::MatrixXd matrix(const Eigen::MatrixXd& mass,
                          const Eigen::MatrixXd& stiffness) const;
+
+  Eigen::SparseMatrix<double> matrix(
+      const Eigen::SparseMatrix<double>& mass,
+      const Eigen::SparseMatrix<double>& stiffness) const;
 
  private:
   double alpha_mass_;

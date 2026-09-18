@@ -7,19 +7,22 @@
 
 namespace fem {
 
-// Uniform line load q = [qx, qy, qz] in force/length.
-// Local is the default; Global is useful for gravity-like loads on inclined beams.
-class BeamUniformLoad3D final : public BeamElementLoad3D {
+// Linearly varying line load over the complete Beam3D.
+// q_i and q_j are the force/length vectors at node i and node j.
+class BeamLinearLoad3D final : public BeamElementLoad3D {
  public:
-  BeamUniformLoad3D(
+  BeamLinearLoad3D(
       ElementId element_id,
-      const Eigen::Vector3d& load_per_length,
+      const Eigen::Vector3d& load_per_length_i,
+      const Eigen::Vector3d& load_per_length_j,
       BeamLoadCoordinateSystem coordinate_system = BeamLoadCoordinateSystem::Local)
       : BeamElementLoad3D(element_id),
-        load_per_length_(load_per_length),
+        load_per_length_i_(load_per_length_i),
+        load_per_length_j_(load_per_length_j),
         coordinate_system_(coordinate_system) {}
 
-  const Eigen::Vector3d& loadPerLength() const noexcept { return load_per_length_; }
+  const Eigen::Vector3d& loadPerLengthI() const noexcept { return load_per_length_i_; }
+  const Eigen::Vector3d& loadPerLengthJ() const noexcept { return load_per_length_j_; }
   BeamLoadCoordinateSystem coordinateSystem() const noexcept { return coordinate_system_; }
 
   Eigen::VectorXd equivalentNodalLoad(
@@ -33,8 +36,11 @@ class BeamUniformLoad3D final : public BeamElementLoad3D {
       BeamSectionSide side) const override;
 
  private:
-  Eigen::Vector3d load_per_length_;
+  Eigen::Vector3d load_per_length_i_;
+  Eigen::Vector3d load_per_length_j_;
   BeamLoadCoordinateSystem coordinate_system_;
 };
+
+using BeamTrapezoidalLoad3D = BeamLinearLoad3D;
 
 }  // namespace fem

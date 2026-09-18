@@ -1,33 +1,71 @@
 #include "fem/solver/LinearStaticSolver.hpp"
-#include <Eigen/LU>
+#include "fem/solver/SparseDofReducer.hpp"
+
+#include <Eigen/SparseCholesky>
+
 #include <stdexcept>
 #include <vector>
+
 namespace fem {
+
 StaticResult LinearStaticSolver::solve(const Model& model) const {
-  AssembledSystem sys=model.assemble();
-  const Eigen::Index n=sys.load.size();
+  AssembledSystem system = model.assemble();
+  const Eigen::Index global_size = system.load.size();
+
   std::vector<Eigen::Index> free;
-  free.reserve(static_cast<std::size_t>(n));
-  for(NodeId nid:sys.dofs.nodeOrder()){
-    const Node& nd=model.node(nid);
-    for(std::size_t o=0;o<kDofsPerFrameNode;++o){
-      const Dof d=dofFromOffset(o);
-      if(!nd.isFixed(d)) free.push_back(static_cast<Eigen::Index>(sys.dofs.equation(nid,d)));
+  free.reserve(static_cast<std::size_t>(global_size));
+
+  for (const NodeId node_id : system.dofs.nodeOrder()) {
+    const Node& node = model.node(node_id);
+    for (std::size_t offset = 0; offset < kDofsPerFrameNode; ++offset) {
+      const Dof dof = dofFromOffset(offset);
+      if (!node.isFixed(dof)) {
+        free.push_back(
+            static_cast<Eigen::Index>(
+                system.dofs.equation(node_id, dof)));
+      }
     }
   }
-  if(free.empty()) throw std::runtime_error("Model has no free degrees of freedom");
-  const Eigen::Index nf=static_cast<Eigen::Index>(free.size());
-  Eigen::MatrixXd kff(nf,nf); Eigen::VectorXd ff(nf);
-  for(Eigen::Index i=0;i<nf;++i){
-    ff[i]=sys.load[free[static_cast<std::size_t>(i)]];
-    for(Eigen::Index j=0;j<nf;++j) kff(i,j)=sys.stiffness(free[static_cast<std::size_t>(i)],free[static_cast<std::size_t>(j)]);
+
+  if (free.empty()) {
+    throw std::runtime_error(
+        "Model has no free degrees of freedom");
   }
-  Eigen::FullPivLU<Eigen::MatrixXd> lu(kff);
-  if(!lu.isInvertible()) throw std::runtime_error("Reduced stiffness matrix is singular; check constraints, connectivity and section properties");
-  const Eigen::VectorXd uf=lu.solve(ff);
-  Eigen::VectorXd u=Eigen::VectorXd::Zero(n);
-  for(Eigen::Index i=0;i<nf;++i) u[free[static_cast<std::size_t>(i)]]=uf[i];
-  const Eigen::VectorXd reaction=sys.stiffness*u-sys.load;
-  return {std::move(u),reaction,std::move(sys.dofs)};
+
+  const Eigen::SparseMatrix<double> kff =
+      SparseDofReducer::matrix(system.stiffness, free);
+  const Eigen::VectorXd ff =
+      SparseDofReducer::vector(system.load, free);
+
+  Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> factor;
+  factor.compute(kff);
+  if (factor.info() != Eigen::Success) {
+    throw std::runtime_error(
+        "Reduced stiffness matrix factorization failed; "
+        "check constraints, connectivity and section properties");
+  }
+
+  const Eigen::VectorXd uf = factor.solve(ff);
+  if (factor.info() != Eigen::Success || !uf.allFinite()) {
+    throw std::runtime_error(
+        "Reduced stiffness solve failed; "
+        "check constraints, connectivity and section properties");
+  }
+
+  Eigen::VectorXd displacement =
+      Eigen::VectorXd::Zero(global_size);
+  for (std::size_t i = 0; i < free.size(); ++i) {
+    displacement[free[i]] =
+        uf[static_cast<Eigen::Index>(i)];
+  }
+
+  const Eigen::VectorXd reaction =
+      system.stiffness * displacement - system.load;
+
+  return {
+      std::move(displacement),
+      reaction,
+      std::move(system.dofs)};
 }
+
 }  // namespace fem

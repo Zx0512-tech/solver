@@ -21,6 +21,7 @@ class Beam3D final : public Element {
 
   NodeId nodeI() const noexcept { return node_i_; }
   NodeId nodeJ() const noexcept { return node_j_; }
+  const BeamSection& section() const noexcept { return section_; }
 
   std::vector<ElementDof> dofs() const override;
   Eigen::MatrixXd stiffness(const NodeResolver& node) const override;

@@ -1,8 +1,19 @@
-# Performance Benchmark
+# 性能基准测试
 
-The benchmark executable measures the sparse v1.0 analysis path using an axial Beam3D chain. It is intended for repeatable trend tracking, not as a hard real-time performance guarantee.
+性能基准程序用于测量 v1.0 稀疏求解链在不同模型规模下的组装、静力和 Newmark 瞬态计算表现。
 
-Build and run:
+Benchmark 使用轴向 Beam3D 链式模型，主要用于观察：
+
+- 稀疏矩阵非零元增长
+- 稀疏存储优势
+- 组装耗时
+- 静力求解耗时
+- Newmark 求解耗时
+- 模型规模扩展趋势
+
+它不是针对某台机器给出固定实时性能承诺。
+
+## 构建与运行
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -15,9 +26,7 @@ cmake --build build --parallel
   --csv benchmark.csv
 ```
 
-## Reported columns
-
-The CSV contains:
+## CSV 输出字段
 
 ```text
 elements
@@ -36,50 +45,143 @@ newmark_steps
 static_tip_relative_error
 ```
 
-### Timing definitions
+含义如下：
 
-- `assembly_ms`: median time for `Model::assemble()`.
-- `static_total_ms`: median end-to-end `LinearStaticSolver::solve()` time, including assembly, sparse reduction, factorization, solve and reaction recovery.
-- `newmark_total_ms`: median end-to-end `NewmarkBetaSolver::solve()` time, including assembly, sparse reduction, mass factorization, one-time effective-stiffness factorization, all requested time steps and result-history storage.
+- `elements`：梁单元数量
+- `global_dofs`：全局自由度数量
+- `free_dofs`：自由自由度数量
+- `k_nnz`：总体刚度矩阵 K 的非零元数量
+- `m_nnz`：总体质量矩阵 M 的非零元数量
+- `k_fill_ratio`：K 的非零元占完整稠密矩阵元素总数的比例
+- `sparse_k_bytes`：K 的近似稀疏存储量
+- `dense_k_bytes`：同尺寸稠密 K 所需存储量
+- `dense_to_sparse_k_memory_ratio`：稠密/稀疏存储量比值
+- `assembly_ms`：组装耗时
+- `static_total_ms`：静力全过程耗时
+- `newmark_total_ms`：Newmark 全过程耗时
+- `newmark_steps`：Newmark 时间步数
+- `static_tip_relative_error`：静力端部位移相对解析误差
 
-The median of repeated runs is used to reduce scheduler/noise sensitivity.
+## 时间定义
 
-### Sparse-memory estimate
+### assembly_ms
 
-`sparse_k_bytes` is an approximate compressed-sparse storage estimate based on values, storage indices and outer pointers.
+`Model::assemble()` 的中位数运行时间。
 
-`dense_k_bytes` is the bytes required by an equivalent full `double` matrix:
+包括总体：
+
+- K
+- M
+- F
+
+的组装。
+
+### static_total_ms
+
+`LinearStaticSolver::solve()` 的端到端中位数时间，包括：
+
+- 总体组装
+- 自由 DOF 提取
+- 稀疏约化
+- 稀疏矩阵分解
+- 方程求解
+- 支座反力恢复
+
+### newmark_total_ms
+
+`NewmarkBetaSolver::solve()` 的端到端中位数时间，包括：
+
+- 总体组装
+- 稀疏约化 K/M
+- Rayleigh 阻尼
+- 质量矩阵分解
+- 初始加速度
+- 有效刚度构造
+- `Keff` 一次性稀疏分解
+- 全部时间步求解
+- 位移/速度/加速度历史存储
+
+## 为什么采用多次运行中位数
+
+CI 运行环境会受到：
+
+- CPU 调度
+- 同机其他任务
+- 虚拟化
+- 缓存状态
+
+影响。
+
+因此 benchmark 不使用单次运行时间，而使用多次运行结果的中位数降低随机噪声。
+
+## 稀疏存储估算
+
+`sparse_k_bytes` 根据压缩稀疏矩阵中的：
+
+- 数值
+- 索引
+- 外层指针
+
+进行近似估算。
+
+`dense_k_bytes` 按：
 
 ```text
 global_dofs * global_dofs * sizeof(double)
 ```
 
-The ratio is a storage comparison for K only. It is not a process resident-memory measurement.
+计算。
 
-## CI benchmark
+这个比值表示 K 本身的理论存储差异，不代表整个进程的实际常驻内存。
 
-CI runs:
+## 当前 CI 基准规模
+
+CI 自动运行：
 
 ```text
-100 elements
-500 elements
-2000 elements
-50 Newmark steps
-5 timing repeats
+100 个梁单元
+500 个梁单元
+2000 个梁单元
+
+50 个 Newmark 时间步
+每个规模重复 5 次
 ```
 
-and uploads `benchmark.csv` as the `solver-benchmark` artifact.
+并上传：
 
-Absolute timings from hosted CI runners should be treated as samples, because CPU scheduling and runner hardware can vary. Trend comparisons should use comparable runners/build types and several runs.
+```text
+benchmark.csv
+```
 
-## Correctness guard
+作为 `solver-benchmark` artifact。
 
-The benchmark also checks the static tip displacement of the axial chain against:
+## 正确性保护
+
+Benchmark 不只计时，还会将轴向梁链的静力端部位移与解析解比较：
 
 ```text
 u_tip = P L_total / EA
 ```
 
-and fails if the relative error exceeds the benchmark correctness tolerance.
+如果相对误差超过基准测试允许范围，benchmark 会直接失败。
 
-The modal solver is intentionally not included in the scale benchmark because the current v1.0 modal reduced eigensolve is dense. Modal correctness is covered by the v1.0 verification suite.
+因此性能测试必须建立在结果正确的前提下。
+
+## 如何理解 CI 时间
+
+GitHub Hosted Runner 的绝对毫秒数不应视为固定性能承诺。
+
+合理的比较方式是：
+
+- 使用相同 Build Type
+- 使用相同 runner 类型
+- 使用相同模型
+- 使用相同时间步
+- 使用多次运行
+- 观察长期趋势
+
+## 模态分析说明
+
+当前 v1.0 模态约化特征值问题仍采用稠密求解，因此没有把大规模模态分析纳入稀疏性能 benchmark。
+
+模态正确性由 v1.0 Verification Suite 单独验证。

@@ -76,6 +76,9 @@ if(SOLVER_BUILD_EXAMPLES)
 
   add_executable(beam_stress_recovery_example examples/beam_stress_recovery.cpp)
   target_link_libraries(beam_stress_recovery_example PRIVATE solver::core)
+
+  add_executable(result_envelope_example examples/result_envelope.cpp)
+  target_link_libraries(result_envelope_example PRIVATE solver::core)
 endif()
 
 if(SOLVER_BUILD_TESTS)

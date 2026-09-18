@@ -28,12 +28,13 @@ Node + Material + Section
           ▼
  Sparse Global K / M
           │
-          ├───────────────┐
-          ▼               ▼
-LinearStaticSolver    ModalSolver
-          │               │
-          │          Dense reduced
-          │          eigenproblem
+          ├────────────────────┐
+          ▼                    ▼
+LinearStaticSolver         ModalSolver
+          │                    │
+          │               Sparse Kff/Mff
+          │                    │
+          │             Shift-Invert Lanczos
           │
           ▼
 NewmarkBetaSolver
@@ -195,9 +196,31 @@ R = K U - F
 K phi = omega^2 M phi
 ```
 
-总体 K/M 保持稀疏。
+总体和约化矩阵均保持稀疏：
 
-当前 v1.0 在提取自由 DOF 后，将约化 Kff/Mff 转为稠密矩阵，再使用广义自伴特征值求解器。
+```text
+Sparse Global K/M
+      ↓
+SparseDofReducer
+      ↓
+Sparse Kff/Mff
+      ↓
+Spectra Shift-Invert
+      ↓
+Lanczos
+```
+
+求解器通过 Spectra 的对称广义特征值 Shift-Invert Lanczos 算法提取最低阶结构模态。
+
+对于自由-自由模型，为避免 `K` 因刚体模态奇异而无法在零点做 shift-invert，程序采用一个很小的负 shift。由于非负特征值到该负 shift 的距离仍按特征值从小到大排列，因此首先得到刚体零频模态，然后得到最低阶正结构模态；程序会过滤零/非正特征值。
+
+返回的振型按：
+
+```text
+phi^T M phi = 1
+```
+
+进行质量归一化，同时保留 Lanczos 迭代次数和矩阵算子调用次数用于诊断。
 
 ## 8. NewmarkBetaSolver
 

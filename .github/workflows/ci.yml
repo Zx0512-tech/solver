@@ -13,8 +13,10 @@ jobs:
         run: cmake --build build --parallel
       - name: Test
         run: ctest --test-dir build --output-on-failure -R '^(beam3d|dynamics|element_response|beam_loads|partial_beam_loads|time_element_loads|beam_section_forces|beam_force_output|section_stress|result_recorders|sparse_assembly|sparse_solvers|v1_verification)$'
+      - name: V1 verification report
+        run: ./build/test_v1_verification
       - name: Performance benchmark
-        run: ./build/solver_benchmark --sizes 100,500,2000 --steps 50 --repeats 2 --csv benchmark.csv
+        run: ./build/solver_benchmark --sizes 100,500,2000 --steps 50 --repeats 5 --csv benchmark.csv
       - name: Upload benchmark CSV
         uses: actions/upload-artifact@v4
         with:

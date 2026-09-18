@@ -329,3 +329,30 @@ Run:
 ```
 
 to see tip-displacement, root-bending-moment and root-normal-stress envelopes from a Newmark transient analysis.
+
+
+## v1.0 verification and performance
+
+Release-level verification is provided by:
+
+```bash
+./build/test_v1_verification
+```
+
+It checks complete static, modal, transient, section-force, stress and recorder/envelope paths against analytical results.
+
+Performance/scaling measurements are provided by:
+
+```bash
+./build/solver_benchmark \
+  --sizes 100,500,2000 \
+  --steps 50 \
+  --repeats 5 \
+  --csv benchmark.csv
+```
+
+The benchmark reports sparse matrix nonzero counts, fill ratio, approximate sparse-vs-dense K storage, assembly time, end-to-end static time and end-to-end Newmark time.
+
+See:
+- `docs/v1-verification.md`
+- `docs/performance-benchmark.md`

@@ -173,6 +173,7 @@ struct BenchmarkRow {
   double k_fill_ratio{};
   std::size_t sparse_k_bytes{};
   std::size_t dense_k_bytes{};
+  double dense_to_sparse_k_memory_ratio{};
   double assembly_ms{};
   double static_total_ms{};
   double newmark_total_ms{};
@@ -268,6 +269,11 @@ BenchmarkRow runCase(
       approximateSparseBytes(assembled.stiffness);
   const std::size_t dense_k_bytes =
       global_dofs * global_dofs * sizeof(double);
+  const double memory_ratio =
+      sparse_k_bytes > 0U
+          ? static_cast<double>(dense_k_bytes) /
+                static_cast<double>(sparse_k_bytes)
+          : 0.0;
 
   constexpr double e = 210.0e9;
   constexpr double area = 0.01;
@@ -298,6 +304,7 @@ BenchmarkRow runCase(
       fill_ratio,
       sparse_k_bytes,
       dense_k_bytes,
+      memory_ratio,
       assembly_ms,
       static_ms,
       newmark_ms,
@@ -309,6 +316,7 @@ void writeHeader(std::ostream& stream) {
   stream
       << "elements,global_dofs,free_dofs,k_nnz,m_nnz,"
       << "k_fill_ratio,sparse_k_bytes,dense_k_bytes,"
+      << "dense_to_sparse_k_memory_ratio,"
       << "assembly_ms,static_total_ms,newmark_total_ms,"
       << "newmark_steps,static_tip_relative_error\n";
 }
@@ -323,6 +331,7 @@ void writeRow(std::ostream& stream, const BenchmarkRow& row) {
          << row.k_fill_ratio << ','
          << row.sparse_k_bytes << ','
          << row.dense_k_bytes << ','
+         << row.dense_to_sparse_k_memory_ratio << ','
          << row.assembly_ms << ','
          << row.static_total_ms << ','
          << row.newmark_total_ms << ','

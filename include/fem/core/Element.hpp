@@ -1,0 +1,21 @@
+#pragma once
+#include "fem/core/Node.hpp"
+#include "fem/core/Types.hpp"
+#include <Eigen/Core>
+#include <functional>
+#include <utility>
+#include <vector>
+namespace fem {
+using NodeResolver = std::function<const Node&(NodeId)>;
+using ElementDof = std::pair<NodeId,Dof>;
+class Element {
+ public:
+  explicit Element(ElementId id) : id_(id) {}
+  virtual ~Element() = default;
+  ElementId id() const noexcept { return id_; }
+  virtual std::vector<ElementDof> dofs() const = 0;
+  virtual Eigen::MatrixXd stiffness(const NodeResolver& node) const = 0;
+ private:
+  ElementId id_;
+};
+}  // namespace fem

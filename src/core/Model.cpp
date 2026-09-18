@@ -308,6 +308,28 @@ BeamSectionForces Model::beamSectionForces(
       section_moment.z()};
 }
 
+double Model::beamNormalStressAt(
+    ElementId element_id,
+    double x,
+    double y,
+    double z,
+    const Eigen::VectorXd& global_displacement,
+    double time,
+    BeamSectionSide side) const {
+  const Element& target = element(element_id);
+  const auto* beam = dynamic_cast<const Beam3D*>(&target);
+  if (beam == nullptr) {
+    throw std::invalid_argument(
+        "beamNormalStressAt requires a Beam3D element");
+  }
+
+  const BeamSectionForces forces =
+      beamSectionForces(
+          element_id, x, global_displacement, time, side);
+  return BeamSectionStressRecovery{}.normalStressAt(
+      beam->section(), forces, y, z);
+}
+
 BeamSectionStress Model::beamStressAt(
     ElementId element_id,
     double x,

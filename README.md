@@ -25,6 +25,8 @@ A compact C++ finite-element solver focused on clear element formulations and ex
 - `BeamUniformLoad3D`: uniform line load
 - `BeamLinearLoad3D`: triangular/trapezoidal line load with independent i/j intensities
 - `BeamPointLoad3D`: concentrated force and/or moment at an arbitrary distance from node i
+- `BeamPartialLinearLoad3D`: uniform/triangular/trapezoidal line load acting only on a selected beam interval
+- `TimeDependentElementLoad`: reusable scalar time history for any spatial element load, supporting `P(t)` and `q(x,t)`
 - beam loads may be defined in local or global coordinates
 - consistent equivalent nodal loads based on beam interpolation functions
 - element resisting/end forces retain fixed-end effects from element loads
@@ -57,6 +59,30 @@ model.addElementLoad<fem::BeamLinearLoad3D>(
 // Concentrated force 1.5 m from node i.
 model.addElementLoad<fem::BeamPointLoad3D>(
     1, 1.5, Eigen::Vector3d(0.0, -10000.0, 0.0));
+
+// Partial trapezoidal load acting only from x=1.0 m to x=4.0 m.
+model.addElementLoad<fem::BeamPartialLinearLoad3D>(
+    1,
+    1.0,
+    4.0,
+    Eigen::Vector3d(0.0, -1000.0, 0.0),
+    Eigen::Vector3d(0.0, -3000.0, 0.0));
+
+// Time-dependent point load P(t) = P0 sin(omega t).
+model.addTimeDependentElementLoad<fem::BeamPointLoad3D>(
+    [omega](double t) { return std::sin(omega * t); },
+    1,
+    1.5,
+    Eigen::Vector3d(0.0, -10000.0, 0.0));
+
+// Time-dependent partial distributed load q(x,t) = q0(x) * scale(t).
+model.addTimeDependentElementLoad<fem::BeamPartialLinearLoad3D>(
+    [](double t) { return 1.0 + 0.5 * std::sin(20.0 * t); },
+    1,
+    1.0,
+    4.0,
+    Eigen::Vector3d(0.0, -1000.0, 0.0),
+    Eigen::Vector3d(0.0, -3000.0, 0.0));
 ```
 
 ### Analysis
@@ -65,6 +91,8 @@ model.addElementLoad<fem::BeamPointLoad3D>(
 - Rayleigh damping `C = alpha M + beta K`
 - Newmark-beta transient integration for `M a + C v + K u = F(t)`
 - arbitrary nodal time-history loads
+- arbitrary time-dependent element loads evaluated at every Newmark step
+- time-aware element-force recovery, so recorder output subtracts the current equivalent element load
 - initial displacement and velocity support
 
 ## Response architecture

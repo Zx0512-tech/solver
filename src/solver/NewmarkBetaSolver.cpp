@@ -61,9 +61,13 @@ Eigen::VectorXd initialVector(const Eigen::VectorXd& supplied,
 }
 
 Eigen::VectorXd forceAt(double time,
+                        const Model& model,
                         const AssembledSystem& system,
                         const std::vector<NodalTimeLoad>& time_loads) {
-  Eigen::VectorXd force = system.load;
+  Eigen::VectorXd force = model.loadVector(time);
+  if (force.size() != system.load.size()) {
+    throw std::runtime_error("Model load vector size changed during transient analysis");
+  }
   for (const auto& load : time_loads) {
     if (!load.value) {
       throw std::invalid_argument("Nodal time load function cannot be empty");
@@ -113,7 +117,7 @@ NewmarkResult NewmarkBetaSolver::solve(const Model& model,
   Eigen::VectorXd u = selectVector(u0_full, free);
   Eigen::VectorXd v = selectVector(v0_full, free);
 
-  const Eigen::VectorXd f0 = selectVector(forceAt(0.0, system, time_loads), free);
+  const Eigen::VectorXd f0 = selectVector(forceAt(0.0, model, system, time_loads), free);
   Eigen::VectorXd a = mass_factor.solve(f0 - c * v - k * u);
 
   const double dt = settings.time_step;
@@ -147,7 +151,7 @@ NewmarkResult NewmarkBetaSolver::solve(const Model& model,
 
   for (std::size_t step = 0; step < settings.step_count; ++step) {
     const double time = static_cast<double>(step + 1U) * dt;
-    const Eigen::VectorXd force = selectVector(forceAt(time, system, time_loads), free);
+    const Eigen::VectorXd force = selectVector(forceAt(time, model, system, time_loads), free);
 
     const Eigen::VectorXd effective_force =
         force +

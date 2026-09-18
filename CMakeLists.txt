@@ -39,7 +39,9 @@ add_library(solver_core
   src/elements/Beam3D.cpp
   src/loads/BeamLinearLoad3D.cpp
   src/loads/BeamPointLoad3D.cpp
+  src/loads/BeamPartialLinearLoad3D.cpp
   src/loads/BeamUniformLoad3D.cpp
+  src/loads/TimeDependentElementLoad.cpp
   src/recorder/ElementRecorder.cpp
   src/solver/LinearStaticSolver.cpp
   src/solver/ModalSolver.cpp

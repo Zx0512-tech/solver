@@ -286,6 +286,50 @@ void testCircleNormalStressExtrema() {
        "circle maximum normal stress");
 }
 
+void testModelNormalStressRemainsAvailableWhenFullStressIsUnsupported() {
+  constexpr double length = 2.0;
+  constexpr double axial = 40000.0;
+  constexpr double shear_y = -5000.0;
+  const fem::GeneralSection section(0.02, 8.0e-5, 1.2e-4, 6.0e-5);
+
+  fem::Model model;
+  auto& root = model.addNode(1, {0.0, 0.0, 0.0});
+  auto& tip = model.addNode(2, {length, 0.0, 0.0});
+  fixAll(root);
+  model.addElement<fem::Beam3D>(
+      1,
+      1,
+      2,
+      fem::LinearElasticMaterial(210.0e9, 0.3, 7850.0),
+      section);
+
+  tip.addLoad(fem::Dof::UX, axial);
+  tip.addLoad(fem::Dof::UY, shear_y);
+
+  const auto result = fem::LinearStaticSolver{}.solve(model);
+
+  const double sigma =
+      model.beamNormalStressAt(
+          1,
+          0.0,
+          0.0,
+          0.0,
+          result.displacement);
+
+  near(sigma, axial / section.area, 1.0e-10,
+       "model normal stress should remain available for GeneralSection");
+
+  bool full_stress_threw = false;
+  try {
+    (void)model.beamStressAt(
+        1, 0.0, 0.0, 0.0, result.displacement);
+  } catch (const std::logic_error&) {
+    full_stress_threw = true;
+  }
+  require(full_stress_threw,
+          "full GeneralSection stress should still reject transverse shear");
+}
+
 void testModelBeamStressRecoveryUsesElementSection() {
   constexpr double length = 3.0;
   constexpr double axial = 50000.0;
@@ -338,6 +382,7 @@ int main() {
   testUnsupportedShearTorsionCombinationsFailExplicitly();
   testRectangleNormalStressExtrema();
   testCircleNormalStressExtrema();
+  testModelNormalStressRemainsAvailableWhenFullStressIsUnsupported();
   testModelBeamStressRecoveryUsesElementSection();
   std::cout << "All section/stress recovery tests passed.\n";
   return EXIT_SUCCESS;

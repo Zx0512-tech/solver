@@ -155,19 +155,19 @@ void testNewmarkUndampedFreeVibration() {
   const double period = two_pi / fixture.omega;
 
   fem::NewmarkSettings settings;
-  settings.time_step = period / 200.0;
-  settings.step_count = 200;
+  settings.time_step = period / 2000.0;
+  settings.step_count = 2000;
   settings.beta = 0.25;
   settings.gamma = 0.5;
 
   const auto result =
       fem::NewmarkBetaSolver{}.solve(fixture.model, settings, fem::RayleighDamping{}, {}, initial);
 
-  expectNear(result.displacementAt(100, 2, fem::Dof::UX), -initial_u, 5.0e-6,
+  expectNear(result.displacementAt(1000, 2, fem::Dof::UX), -initial_u, 5.0e-6,
              "Newmark half-period displacement");
-  expectNear(result.displacementAt(200, 2, fem::Dof::UX), initial_u, 5.0e-6,
+  expectNear(result.displacementAt(2000, 2, fem::Dof::UX), initial_u, 5.0e-6,
              "Newmark full-period displacement");
-  expectNear(result.velocityAt(200, 2, fem::Dof::UX), 0.0, 5.0e-5,
+  expectNear(result.velocityAt(2000, 2, fem::Dof::UX), 0.0, 5.0e-5,
              "Newmark full-period velocity");
 }
 

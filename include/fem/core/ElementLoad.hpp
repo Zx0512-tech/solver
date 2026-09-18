@@ -18,6 +18,16 @@ class ElementLoad {
       const Element& element,
       const NodeResolver& node) const = 0;
 
+  // Static loads use the same vector at every time. Time-dependent wrappers
+  // override this method while preserving the spatial load implementation.
+  virtual Eigen::VectorXd equivalentNodalLoadAt(
+      const Element& element,
+      const NodeResolver& node,
+      double time) const {
+    (void)time;
+    return equivalentNodalLoad(element, node);
+  }
+
  private:
   ElementId element_id_;
 };

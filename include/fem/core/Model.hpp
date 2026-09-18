@@ -6,9 +6,11 @@
 #include "fem/core/ElementResponse.hpp"
 #include "fem/core/Node.hpp"
 #include "fem/core/Types.hpp"
+#include "fem/loads/TimeDependentElementLoad.hpp"
 
 #include <Eigen/Core>
 
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <unordered_map>
@@ -43,8 +45,22 @@ class Model {
   template <typename LoadType, typename... Args>
   LoadType& addElementLoad(Args&&... args) {
     auto load = std::make_unique<LoadType>(std::forward<Args>(args)...);
-    (void)element(load->elementId());  // validate target now, not at assembly
+    (void)element(load->elementId());
     LoadType& ref = *load;
+    element_loads_.push_back(std::move(load));
+    return ref;
+  }
+
+  template <typename SpatialLoadType, typename... Args>
+  TimeDependentElementLoad& addTimeDependentElementLoad(
+      std::function<double(double)> scale,
+      Args&&... args) {
+    auto spatial =
+        std::make_unique<SpatialLoadType>(std::forward<Args>(args)...);
+    (void)element(spatial->elementId());
+    auto load = std::make_unique<TimeDependentElementLoad>(
+        std::move(spatial), std::move(scale));
+    TimeDependentElementLoad& ref = *load;
     element_loads_.push_back(std::move(load));
     return ref;
   }
@@ -56,11 +72,16 @@ class Model {
   const Element& element(ElementId id) const;
 
   AssembledSystem assemble() const;
+  Eigen::VectorXd loadVector(double time = 0.0) const;
 
-  Eigen::VectorXd elementEquivalentLoad(ElementId element_id) const;
+  Eigen::VectorXd elementEquivalentLoad(
+      ElementId element_id,
+      double time = 0.0) const;
+
   ElementResponse elementResponse(
       ElementId element_id,
-      const Eigen::VectorXd& global_displacement) const;
+      const Eigen::VectorXd& global_displacement,
+      double time = 0.0) const;
 
   const std::unordered_map<NodeId, Node>& nodes() const noexcept { return nodes_; }
 

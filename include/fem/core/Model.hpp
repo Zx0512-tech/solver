@@ -95,6 +95,15 @@ class Model {
   std::vector<ElementLoadSamplingLocation> elementLoadSampleLocations(
       ElementId element_id) const;
 
+  double beamNormalStressAt(
+      ElementId element_id,
+      double x,
+      double y,
+      double z,
+      const Eigen::VectorXd& global_displacement,
+      double time = 0.0,
+      BeamSectionSide side = BeamSectionSide::Right) const;
+
   BeamSectionStress beamStressAt(
       ElementId element_id,
       double x,

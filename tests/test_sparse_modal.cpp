@@ -180,24 +180,36 @@ void testLanczosMatchesDenseReference() {
   }
 
   const auto system = model.assemble();
+  const auto free = freeDofs(model, system.dofs);
+  const Eigen::MatrixXd kff =
+      denseReduced(system.stiffness, free);
+  const Eigen::MatrixXd mff =
+      denseReduced(system.mass, free);
+
   for (std::size_t mode = 0;
        mode < requested;
        ++mode) {
-    const Eigen::VectorXd phi =
-        result.mode_shapes.col(
-            static_cast<Eigen::Index>(mode));
+    Eigen::VectorXd reduced_phi(
+        static_cast<Eigen::Index>(free.size()));
+    for (std::size_t i = 0; i < free.size(); ++i) {
+      reduced_phi[static_cast<Eigen::Index>(i)] =
+          result.mode_shapes(
+              free[i],
+              static_cast<Eigen::Index>(mode));
+    }
+
     const double lambda =
         result.angular_frequencies[mode] *
         result.angular_frequencies[mode];
     const Eigen::VectorXd residual =
-        system.stiffness * phi -
-        lambda * (system.mass * phi);
+        kff * reduced_phi -
+        lambda * (mff * reduced_phi);
     const double scale =
         std::max(
             1.0,
-            (system.stiffness * phi).norm());
+            (kff * reduced_phi).norm());
     if (residual.norm() / scale > 1.0e-8) {
-      fail("Lanczos mode residual is too large");
+      fail("Lanczos free-DOF mode residual is too large");
     }
   }
 }

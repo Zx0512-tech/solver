@@ -8,7 +8,7 @@ A compact C++ finite-element solver focused on clear element formulations and ex
 - nodes, constraints and nodal loads
 - linear-elastic material and beam section
 - deterministic global DOF numbering
-- dense global stiffness, mass and load assembly
+- sparse global stiffness and mass assembly with `Eigen::SparseMatrix<double>`; dense global load vector
 - element-load abstraction with element-owned equivalent nodal loading
 
 ### Beam3D
@@ -178,6 +178,26 @@ const auto extrema =
 ```
 
 `beamNormalStressAt` always recovers the axial+bending normal stress, even when the section's full shear/torsion point-stress model is not implemented. `beamNormalStressExtrema` returns `sigma_min` / `sigma_max` and their section coordinates for rectangles and solid circles.
+
+### Sparse global assembly
+
+Global structural matrices are assembled directly as compressed sparse matrices:
+
+```text
+element K_e / M_e
+      ↓
+global DOF mapping
+      ↓
+Eigen::Triplet<double>
+      ↓
+setFromTriplets()
+      ↓
+SparseMatrix K / M
+```
+
+Duplicate triplets at shared structural DOFs are summed during assembly, so contributions from connected elements accumulate correctly without first allocating a dense global matrix.
+
+PR #9 intentionally changes **global storage/assembly only**. The current static, modal and Newmark solvers still extract their constrained/free-DOF reduced matrices into `Eigen::MatrixXd` before factorization. Sparse reduced-system factorization is deferred to the next solver migration.
 
 ### Analysis
 - linear static solution and reaction recovery

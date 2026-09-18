@@ -91,4 +91,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_time_element_loads tests/test_time_element_loads.cpp)
   target_link_libraries(test_time_element_loads PRIVATE solver::core)
   add_test(NAME time_element_loads COMMAND test_time_element_loads)
+
+  add_executable(test_beam_section_forces tests/test_beam_section_forces.cpp)
+  target_link_libraries(test_beam_section_forces PRIVATE solver::core)
+  add_test(NAME beam_section_forces COMMAND test_beam_section_forces)
 endif()

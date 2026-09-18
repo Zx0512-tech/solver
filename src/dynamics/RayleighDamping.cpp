@@ -54,4 +54,21 @@ Eigen::MatrixXd RayleighDamping::matrix(const Eigen::MatrixXd& mass,
   return alpha_mass_ * mass + beta_stiffness_ * stiffness;
 }
 
+Eigen::SparseMatrix<double> RayleighDamping::matrix(
+    const Eigen::SparseMatrix<double>& mass,
+    const Eigen::SparseMatrix<double>& stiffness) const {
+  if (mass.rows() != mass.cols() ||
+      stiffness.rows() != stiffness.cols() ||
+      mass.rows() != stiffness.rows()) {
+    throw std::invalid_argument(
+        "Mass and stiffness matrices must be square and the same size");
+  }
+
+  Eigen::SparseMatrix<double> result =
+      alpha_mass_ * mass + beta_stiffness_ * stiffness;
+  result.prune(0.0);
+  result.makeCompressed();
+  return result;
+}
+
 }  // namespace fem

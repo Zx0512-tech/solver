@@ -53,6 +53,7 @@ add_library(solver_core
   src/solver/LinearStaticSolver.cpp
   src/solver/ModalSolver.cpp
   src/solver/NewmarkBetaSolver.cpp
+  src/solver/SparseDofReducer.cpp
 )
 add_library(solver::core ALIAS solver_core)
 

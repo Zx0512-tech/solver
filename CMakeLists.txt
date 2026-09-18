@@ -11,12 +11,25 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(FetchContent)
 find_package(Eigen3 3.4 QUIET NO_MODULE)
 if(NOT Eigen3_FOUND)
+  set(_solver_build_testing_was_defined FALSE)
+  if(DEFINED BUILD_TESTING)
+    set(_solver_build_testing_was_defined TRUE)
+    set(_solver_saved_build_testing "${BUILD_TESTING}")
+  endif()
+
+  set(BUILD_TESTING OFF CACHE BOOL "Disable dependency tests while fetching Eigen" FORCE)
   FetchContent_Declare(
     eigen
     URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
   )
   FetchContent_MakeAvailable(eigen)
+
+  if(_solver_build_testing_was_defined)
+    set(BUILD_TESTING "${_solver_saved_build_testing}" CACHE BOOL "Build tests" FORCE)
+  else()
+    unset(BUILD_TESTING CACHE)
+  endif()
 endif()
 
 add_library(solver_core

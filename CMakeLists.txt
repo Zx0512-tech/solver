@@ -46,6 +46,7 @@ add_library(solver_core
   src/loads/TimeDependentElementLoad.cpp
   src/recorder/ElementRecorder.cpp
   src/response/BeamResponseSampler.cpp
+  src/response/BeamSectionStressRecovery.cpp
   src/solver/LinearStaticSolver.cpp
   src/solver/ModalSolver.cpp
   src/solver/NewmarkBetaSolver.cpp

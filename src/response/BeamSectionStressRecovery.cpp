@@ -8,16 +8,10 @@
 namespace fem {
 namespace {
 
-double forceTolerance(const BeamSectionForces& f) {
-  const double scale = std::max({
-      1.0,
-      std::abs(f.N),
-      std::abs(f.Vy),
-      std::abs(f.Vz),
-      std::abs(f.T),
-      std::abs(f.My),
-      std::abs(f.Mz)});
-  return 1.0e-12 * scale;
+bool isNonzeroResultant(double value) {
+  const double tolerance =
+      1.0e-12 * std::max(1.0, std::abs(value));
+  return std::abs(value) > tolerance;
 }
 
 void validatePoint(
@@ -85,13 +79,11 @@ BeamSectionStress BeamSectionStressRecovery::stressAt(
   BeamSectionStress stress;
   stress.sigma_x = normalStressAt(section, forces, y, z);
 
-  const double tolerance = forceTolerance(forces);
-
   switch (section.kind) {
     case BeamSectionKind::General:
-      if (std::abs(forces.Vy) > tolerance ||
-          std::abs(forces.Vz) > tolerance ||
-          std::abs(forces.T) > tolerance) {
+      if (isNonzeroResultant(forces.Vy) ||
+          isNonzeroResultant(forces.Vz) ||
+          isNonzeroResultant(forces.T)) {
         throw std::logic_error(
             "GeneralSection full shear/torsion stress recovery is not implemented; "
             "normalStressAt remains available");
@@ -99,7 +91,7 @@ BeamSectionStress BeamSectionStressRecovery::stressAt(
       return stress;
 
     case BeamSectionKind::Rectangle: {
-      if (std::abs(forces.T) > tolerance) {
+      if (isNonzeroResultant(forces.T)) {
         throw std::logic_error(
             "RectangleSection torsional point stress is not implemented");
       }
@@ -117,8 +109,8 @@ BeamSectionStress BeamSectionStressRecovery::stressAt(
     }
 
     case BeamSectionKind::SolidCircle:
-      if (std::abs(forces.Vy) > tolerance ||
-          std::abs(forces.Vz) > tolerance) {
+      if (isNonzeroResultant(forces.Vy) ||
+          isNonzeroResultant(forces.Vz)) {
         throw std::logic_error(
             "CircularSection transverse-shear point stress is not implemented");
       }

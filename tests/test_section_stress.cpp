@@ -227,6 +227,25 @@ void testUnsupportedShearTorsionCombinationsFailExplicitly() {
   }
 }
 
+void testUnsupportedComponentCheckIsNotMaskedByOtherLargeResultants() {
+  const fem::RectangleSection section(0.20, 0.40);
+  fem::BeamSectionForces forces;
+  forces.N = 1.0e12;
+  forces.T = 0.1;
+
+  bool threw = false;
+  try {
+    (void)fem::BeamSectionStressRecovery{}.stressAt(
+        section, forces, 0.0, 0.0);
+  } catch (const std::logic_error&) {
+    threw = true;
+  }
+
+  require(
+      threw,
+      "large axial force must not mask a nonzero unsupported torsion");
+}
+
 void testRectangleNormalStressExtrema() {
   const fem::RectangleSection section(0.20, 0.40);
   fem::BeamSectionForces forces;
@@ -380,6 +399,7 @@ int main() {
   testCircleTorsionStress();
   testPointOutsideKnownSectionRejected();
   testUnsupportedShearTorsionCombinationsFailExplicitly();
+  testUnsupportedComponentCheckIsNotMaskedByOtherLargeResultants();
   testRectangleNormalStressExtrema();
   testCircleNormalStressExtrema();
   testModelNormalStressRemainsAvailableWhenFullStressIsUnsupported();

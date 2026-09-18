@@ -123,6 +123,54 @@ beam_1_torsion.svg
 
 For 3D beams, the shear diagram contains both `Vy` and `Vz`, and the bending diagram contains both `My` and `Mz`. SVG output has no external plotting dependency and can be opened directly in a browser.
 
+### Section geometry and stress recovery
+
+The section layer keeps the original property-only API and adds geometry-aware convenience types:
+
+```cpp
+fem::GeneralSection general(A, Iy, Iz, J);
+fem::RectangleSection rectangle(size_y, size_z);
+fem::CircularSection circle(radius);
+```
+
+`RectangleSection` derives `A`, `Iy`, `Iz` and an engineering Saint-Venant torsion-constant approximation from its dimensions. `CircularSection` derives the exact solid-circle properties.
+
+Normal stress is available for every section:
+
+```text
+sigma_x = N/A - Mz*y/Iz + My*z/Iy
+```
+
+For geometry-aware sections the solver also validates that the requested `(y,z)` point lies inside the section.
+
+Supported full point-stress recovery in v1.0:
+
+- `RectangleSection`: axial/biaxial-bending normal stress plus classical rectangular `Vy/Vz` transverse shear.
+- `CircularSection`: axial/biaxial-bending normal stress plus solid-circle Saint-Venant torsional shear.
+- `GeneralSection`: axial/biaxial-bending normal stress only because boundary/shear geometry is unknown.
+
+Unsupported combinations throw explicitly instead of dropping a stress contribution silently. In particular, rectangular torsional point stress and circular transverse-shear point stress are intentionally deferred.
+
+Example:
+
+```cpp
+const auto stress =
+    model.beamStressAt(
+        beam_id,
+        x,
+        y,
+        z,
+        result.displacement);
+
+const auto extrema =
+    model.beamNormalStressExtrema(
+        beam_id,
+        x,
+        result.displacement);
+```
+
+`beamNormalStressExtrema` returns `sigma_min` / `sigma_max` and their section coordinates for rectangles and solid circles.
+
 ### Analysis
 - linear static solution and reaction recovery
 - generalized eigenvalue modal analysis `K phi = omega^2 M phi`
@@ -172,3 +220,11 @@ Run the force-diagram example with:
 ```
 
 It writes a CSV file and four SVG diagrams into `beam_force_output/`.
+
+Run the section-stress example with:
+
+```bash
+./build/beam_stress_recovery_example
+```
+
+It reports the root-section point stress and minimum/maximum normal stress for a rectangular Beam3D.

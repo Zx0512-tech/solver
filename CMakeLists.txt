@@ -70,6 +70,9 @@ if(SOLVER_BUILD_EXAMPLES)
 
   add_executable(beam_force_diagrams_example examples/beam_force_diagrams.cpp)
   target_link_libraries(beam_force_diagrams_example PRIVATE solver::core)
+
+  add_executable(beam_stress_recovery_example examples/beam_stress_recovery.cpp)
+  target_link_libraries(beam_stress_recovery_example PRIVATE solver::core)
 endif()
 
 if(SOLVER_BUILD_TESTS)

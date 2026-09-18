@@ -1,6 +1,6 @@
 # solver
 
-一个基于 **C++17 + Eigen** 实现的三维梁结构有限元求解器，重点关注清晰的单元公式、可扩展的分析架构、完整的结果恢复，以及可验证的数值计算流程。
+一个基于 **C++17 + Eigen + Spectra** 实现的三维梁结构有限元求解器，重点关注清晰的单元公式、可扩展的分析架构、完整的结果恢复，以及可验证的数值计算流程。
 
 当前 v1.0 已形成从建模、组装、求解到后处理和验证的完整链路，支持线性静力、模态分析和 Newmark-β 瞬态动力分析。
 
@@ -320,13 +320,33 @@ Keff = K + a0 M + a1 C
 K phi = omega^2 M phi
 ```
 
-当前 v1.0 的总体 `K/M` 已采用稀疏存储，但约化后的广义特征值问题仍使用 Eigen 的稠密特征值求解器。
+当前模态求解链保持稀疏：
+
+```text
+Sparse Global K / M
+      ↓
+SparseDofReducer
+      ↓
+Sparse Kff / Mff
+      ↓
+Shift-Invert
+      ↓
+Lanczos 子空间迭代
+      ↓
+最低阶结构模态
+```
+
+求解器使用 Spectra 1.2.0 的对称广义特征值 `SymGEigsShiftSolver`，对 `Kff/Mff` 采用 Shift-Invert Lanczos 方法提取低阶特征值。
+
+为兼容自由-自由结构的刚体零频模态，使用一个相对于系统特征值尺度很小的负 shift，使 `K - sigma M` 可稳定分解；求得候选特征值后过滤零/非正特征值并返回最低阶正结构模态。
+
+返回的振型按质量矩阵进行归一化，并记录 Lanczos 的迭代次数和算子调用次数。单自由度问题作为解析特例直接计算 `lambda = K/M`。
 
 ## 分析能力
 
 - 线性静力分析
 - 支座反力恢复
-- 广义特征值模态分析
+- 稀疏 Shift-Invert Lanczos 广义特征值模态分析
 - Rayleigh 阻尼
 - Newmark-β 瞬态动力分析
 - 任意节点时变荷载
@@ -419,7 +439,7 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-项目使用 Eigen 3.4 进行线性代数计算。
+项目使用 Eigen 3.4 进行线性代数计算，并使用 Spectra 1.2.0 完成稀疏 Lanczos 模态求解。
 
 ### 示例程序
 
@@ -461,7 +481,7 @@ Verification Suite 使用结构力学解析解检查：
 - 截面正应力
 - Recorder / Envelope 完整结果链路
 
-当前完整 CI 包含 13 组 CTest，并额外运行 v1.0 Verification Suite 和性能基准测试。
+当前完整 CI 包含 14 组 CTest，并额外运行 v1.0 Verification Suite 和性能基准测试。
 
 详细说明：
 

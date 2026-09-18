@@ -188,8 +188,26 @@ Verification Suite 负责更高一层的：
 当前 CI 中：
 
 ```text
-13 / 13 CTest 通过
+14 / 14 CTest 通过
 22 / 22 v1.0 端到端检查通过
 ```
 
 当前最大相对误差来自有限元离散后的悬臂梁一阶弯曲模态，而不是静力或动力线性方程求解误差。
+
+## 稀疏 Lanczos 回归验证
+
+除发布级解析模态验证外，新增 `sparse_modal` 回归测试：
+
+- 20 单元悬臂梁提取前 4 阶模态
+- 与独立 dense generalized eigensolve 参考结果交叉比较
+- 检查自由 DOF 子空间残差
+
+```text
+Kff phi - lambda Mff phi
+```
+
+- 验证返回后端为 `SparseLanczosShiftInvert`
+- 检查 Lanczos 迭代次数和算子调用次数
+- 自由-自由 Beam3D 模型包含刚体零频模态时，验证程序能够跳过零模态并恢复最低阶正结构模态
+
+dense 求解仅存在于测试代码中作为小规模参考答案，不再属于生产 `ModalSolver` 的求解路径。

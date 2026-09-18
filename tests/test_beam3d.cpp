@@ -28,15 +28,34 @@ void axial(){
   near(s.displacementAt(2,fem::Dof::UX),P*L/(E*A),1e-10,"axial displacement");
   near(s.reactionAt(1,fem::Dof::UX),-P,1e-10,"axial reaction");
 }
-void bending(){
+void bendingZ(){
   fem::Model m; auto& r=m.addNode(1,{0,0,0}); auto& t=m.addNode(2,{3,0,0}); fixAll(r);
   const double E=200e9,Iz=8e-6,L=3,P=-12000;
   m.addElement<fem::Beam3D>(1,1,2,fem::LinearElasticMaterial(E,.3),fem::BeamSection(.01,6e-6,Iz,1e-5));
   t.addLoad(fem::Dof::UY,P); const auto s=fem::LinearStaticSolver{}.solve(m);
-  near(s.displacementAt(2,fem::Dof::UY),P*L*L*L/(3*E*Iz),1e-10,"tip deflection");
-  near(s.displacementAt(2,fem::Dof::RZ),P*L*L/(2*E*Iz),1e-10,"tip rotation");
-  near(s.reactionAt(1,fem::Dof::UY),-P,1e-10,"shear reaction");
-  near(s.reactionAt(1,fem::Dof::RZ),-P*L,1e-10,"moment reaction");
+  near(s.displacementAt(2,fem::Dof::UY),P*L*L*L/(3*E*Iz),1e-10,"local-z bending tip deflection");
+  near(s.displacementAt(2,fem::Dof::RZ),P*L*L/(2*E*Iz),1e-10,"local-z bending tip rotation");
+  near(s.reactionAt(1,fem::Dof::UY),-P,1e-10,"local-z bending shear reaction");
+  near(s.reactionAt(1,fem::Dof::RZ),-P*L,1e-10,"local-z bending moment reaction");
+}
+void bendingY(){
+  fem::Model m; auto& r=m.addNode(1,{0,0,0}); auto& t=m.addNode(2,{3,0,0}); fixAll(r);
+  const double E=200e9,Iy=6e-6,L=3,P=12000;
+  m.addElement<fem::Beam3D>(1,1,2,fem::LinearElasticMaterial(E,.3),fem::BeamSection(.01,Iy,8e-6,1e-5));
+  t.addLoad(fem::Dof::UZ,P); const auto s=fem::LinearStaticSolver{}.solve(m);
+  near(s.displacementAt(2,fem::Dof::UZ),P*L*L*L/(3*E*Iy),1e-10,"local-y bending tip deflection");
+  near(s.displacementAt(2,fem::Dof::RY),-P*L*L/(2*E*Iy),1e-10,"local-y bending tip rotation");
+  near(s.reactionAt(1,fem::Dof::UZ),-P,1e-10,"local-y bending shear reaction");
+  near(s.reactionAt(1,fem::Dof::RY),P*L,1e-10,"local-y bending moment reaction");
+}
+void torsion(){
+  fem::Model m; auto& r=m.addNode(1,{0,0,0}); auto& t=m.addNode(2,{2.5,0,0}); fixAll(r);
+  const double E=210e9,nu=.3,J=1.2e-5,L=2.5,T=9000;
+  const double G=E/(2*(1+nu));
+  m.addElement<fem::Beam3D>(1,1,2,fem::LinearElasticMaterial(E,nu),fem::BeamSection(.01,6e-6,8e-6,J));
+  t.addLoad(fem::Dof::RX,T); const auto s=fem::LinearStaticSolver{}.solve(m);
+  near(s.displacementAt(2,fem::Dof::RX),T*L/(G*J),1e-10,"torsional rotation");
+  near(s.reactionAt(1,fem::Dof::RX),-T,1e-10,"torsional reaction");
 }
 void rotated(){
   fem::Model m; auto& r=m.addNode(1,{0,0,0}); auto& t=m.addNode(2,{1,1,0}); fixAll(r);
@@ -49,4 +68,4 @@ void rotated(){
   near(u.dot(axis),P*L/(E*A),1e-10,"rotated axial deformation");
 }
 }
-int main(){stiffnessSymmetry();axial();bending();rotated();std::cout<<"All Beam3D tests passed.\n";return EXIT_SUCCESS;}
+int main(){stiffnessSymmetry();axial();bendingZ();bendingY();torsion();rotated();std::cout<<"All Beam3D tests passed.\n";return EXIT_SUCCESS;}

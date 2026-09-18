@@ -83,9 +83,8 @@ BeamForceSeries BeamResponseSampler::sample(
   BeamForceSeries result;
   result.reserve(locations.size() + 4U);
   for (const auto& location : locations) {
-    const bool interior =
-        location.x > tolerance && location.x < length - tolerance;
-    if (location.has_jump && interior) {
+    const bool has_left_domain = location.x > tolerance;
+    if (location.has_jump && has_left_domain) {
       result.push_back({
           model.beamSectionForces(
               element_id,

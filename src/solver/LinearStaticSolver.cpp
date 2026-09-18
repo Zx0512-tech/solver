@@ -20,7 +20,7 @@ StaticResult LinearStaticSolver::solve(const Model& model) const {
   Eigen::MatrixXd kff(nf,nf); Eigen::VectorXd ff(nf);
   for(Eigen::Index i=0;i<nf;++i){
     ff[i]=sys.load[free[static_cast<std::size_t>(i)]];
-    for(Eigen::Index j=0;j<nf;++j) kff(i,j)=sys.stiffness(free[static_cast<std::size_t>(i)],free[static_cast<std::size_t>(j)]);
+    for(Eigen::Index j=0;j<nf;++j) kff(i,j)=sys.stiffness.coeff(free[static_cast<std::size_t>(i)],free[static_cast<std::size_t>(j)]);
   }
   Eigen::FullPivLU<Eigen::MatrixXd> lu(kff);
   if(!lu.isInvertible()) throw std::runtime_error("Reduced stiffness matrix is singular; check constraints, connectivity and section properties");

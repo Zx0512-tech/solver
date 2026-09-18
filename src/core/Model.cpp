@@ -1,8 +1,49 @@
 #include "fem/core/Model.hpp"
 
+#include "fem/elements/Beam3D.hpp"
+#include "fem/loads/BeamElementLoad3D.hpp"
+#include "fem/response/BeamSectionStressRecovery.hpp"
+
+#include <Eigen/Geometry>
+#include <Eigen/SparseCore>
+
 #include <stdexcept>
 
 namespace fem {
+namespace {
+
+BeamLoadResultant3D scaledResultant(
+    BeamLoadResultant3D result,
+    double factor) {
+  result.force *= factor;
+  result.moment *= factor;
+  return result;
+}
+
+BeamLoadResultant3D beamLoadResultantTo(
+    const ElementLoad& load,
+    const Beam3D& beam,
+    const NodeResolver& node,
+    double x,
+    double time,
+    BeamSectionSide side) {
+  if (const auto* timed =
+          dynamic_cast<const TimeDependentElementLoad*>(&load)) {
+    return scaledResultant(
+        beamLoadResultantTo(
+            timed->spatialLoad(), beam, node, x, time, side),
+        timed->scaleAt(time));
+  }
+
+  const auto* beam_load = dynamic_cast<const BeamElementLoad3D*>(&load);
+  if (beam_load == nullptr) {
+    throw std::runtime_error(
+        "Beam section-force recovery encountered an unsupported element load");
+  }
+  return beam_load->localResultantTo(beam, node, x, side);
+}
+
+}  // namespace
 
 Node& Model::addNode(NodeId id, const Eigen::Vector3d& coordinates) {
   auto [it, inserted] = nodes_.emplace(id, Node{id, coordinates});
@@ -44,22 +85,59 @@ const Element& Model::element(ElementId id) const {
   return *it->second;
 }
 
-AssembledSystem Model::assemble() const {
+Eigen::VectorXd Model::loadVector(double time) const {
   DofManager dm(nodes_);
-  const Eigen::Index n = static_cast<Eigen::Index>(dm.size());
-
-  Eigen::MatrixXd global_k = Eigen::MatrixXd::Zero(n, n);
-  Eigen::MatrixXd global_m = Eigen::MatrixXd::Zero(n, n);
-  Eigen::VectorXd global_f = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd global_f =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(dm.size()));
 
   for (const auto& [node_id, node_ref] : nodes_) {
     for (std::size_t offset = 0; offset < kDofsPerFrameNode; ++offset) {
       const Dof dof = dofFromOffset(offset);
-      global_f[static_cast<Eigen::Index>(dm.equation(node_id, dof))] += node_ref.load(dof);
+      global_f[static_cast<Eigen::Index>(dm.equation(node_id, dof))] +=
+          node_ref.load(dof);
     }
   }
 
-  const NodeResolver resolver = [this](NodeId id) -> const Node& { return node(id); };
+  const NodeResolver resolver = [this](NodeId id) -> const Node& {
+    return node(id);
+  };
+
+  for (const auto& load : element_loads_) {
+    const Element& target = element(load->elementId());
+    const auto element_dofs = target.dofs();
+    const Eigen::VectorXd fe =
+        load->equivalentNodalLoadAt(target, resolver, time);
+    const Eigen::Index ndof = static_cast<Eigen::Index>(element_dofs.size());
+
+    if (fe.size() != ndof) {
+      throw std::runtime_error(
+          "Element load size does not match element DOF count");
+    }
+
+    for (Eigen::Index a = 0; a < ndof; ++a) {
+      const auto [node_a, dof_a] =
+          element_dofs[static_cast<std::size_t>(a)];
+      const Eigen::Index ia =
+          static_cast<Eigen::Index>(dm.equation(node_a, dof_a));
+      global_f[ia] += fe[a];
+    }
+  }
+
+  return global_f;
+}
+
+AssembledSystem Model::assemble() const {
+  DofManager dm(nodes_);
+  const Eigen::Index n = static_cast<Eigen::Index>(dm.size());
+
+  std::vector<Eigen::Triplet<double>> stiffness_triplets;
+  std::vector<Eigen::Triplet<double>> mass_triplets;
+  stiffness_triplets.reserve(elements_.size() * 144U);
+  mass_triplets.reserve(elements_.size() * 144U);
+
+  const NodeResolver resolver = [this](NodeId id) -> const Node& {
+    return node(id);
+  };
 
   for (const auto& [element_id, element_ptr] : elements_) {
     (void)element_id;
@@ -69,59 +147,82 @@ AssembledSystem Model::assemble() const {
     const Eigen::Index ndof = static_cast<Eigen::Index>(element_dofs.size());
 
     if (ke.rows() != ndof || ke.cols() != ndof) {
-      throw std::runtime_error("Element stiffness size does not match element DOF count");
+      throw std::runtime_error(
+          "Element stiffness size does not match element DOF count");
     }
     if (me.rows() != ndof || me.cols() != ndof) {
-      throw std::runtime_error("Element mass size does not match element DOF count");
+      throw std::runtime_error(
+          "Element mass size does not match element DOF count");
     }
 
     for (Eigen::Index a = 0; a < ndof; ++a) {
-      const auto [node_a, dof_a] = element_dofs[static_cast<std::size_t>(a)];
-      const Eigen::Index ia = static_cast<Eigen::Index>(dm.equation(node_a, dof_a));
+      const auto [node_a, dof_a] =
+          element_dofs[static_cast<std::size_t>(a)];
+      const Eigen::Index ia =
+          static_cast<Eigen::Index>(dm.equation(node_a, dof_a));
 
       for (Eigen::Index b = 0; b < ndof; ++b) {
-        const auto [node_b, dof_b] = element_dofs[static_cast<std::size_t>(b)];
-        const Eigen::Index ib = static_cast<Eigen::Index>(dm.equation(node_b, dof_b));
-        global_k(ia, ib) += ke(a, b);
-        global_m(ia, ib) += me(a, b);
+        const auto [node_b, dof_b] =
+            element_dofs[static_cast<std::size_t>(b)];
+        const Eigen::Index ib =
+            static_cast<Eigen::Index>(dm.equation(node_b, dof_b));
+
+        const double stiffness_value = ke(a, b);
+        if (stiffness_value != 0.0) {
+          stiffness_triplets.emplace_back(ia, ib, stiffness_value);
+        }
+
+        const double mass_value = me(a, b);
+        if (mass_value != 0.0) {
+          mass_triplets.emplace_back(ia, ib, mass_value);
+        }
       }
     }
   }
 
-  for (const auto& load : element_loads_) {
-    const Element& target = element(load->elementId());
-    const auto element_dofs = target.dofs();
-    const Eigen::VectorXd fe = load->equivalentNodalLoad(target, resolver);
-    const Eigen::Index ndof = static_cast<Eigen::Index>(element_dofs.size());
+  Eigen::SparseMatrix<double> global_k(n, n);
+  Eigen::SparseMatrix<double> global_m(n, n);
 
-    if (fe.size() != ndof) {
-      throw std::runtime_error("Element load size does not match element DOF count");
-    }
+  global_k.setFromTriplets(
+      stiffness_triplets.begin(), stiffness_triplets.end(),
+      [](double a, double b) { return a + b; });
+  global_m.setFromTriplets(
+      mass_triplets.begin(), mass_triplets.end(),
+      [](double a, double b) { return a + b; });
 
-    for (Eigen::Index a = 0; a < ndof; ++a) {
-      const auto [node_a, dof_a] = element_dofs[static_cast<std::size_t>(a)];
-      const Eigen::Index ia = static_cast<Eigen::Index>(dm.equation(node_a, dof_a));
-      global_f[ia] += fe[a];
-    }
-  }
+  global_k.prune(0.0);
+  global_m.prune(0.0);
+  global_k.makeCompressed();
+  global_m.makeCompressed();
 
-  return {std::move(global_k), std::move(global_m), std::move(global_f), std::move(dm)};
+  return {
+      std::move(global_k),
+      std::move(global_m),
+      loadVector(0.0),
+      std::move(dm)};
 }
 
-Eigen::VectorXd Model::elementEquivalentLoad(ElementId element_id) const {
+Eigen::VectorXd Model::elementEquivalentLoad(
+    ElementId element_id,
+    double time) const {
   const Element& target = element(element_id);
   const auto element_dofs = target.dofs();
   Eigen::VectorXd result =
       Eigen::VectorXd::Zero(static_cast<Eigen::Index>(element_dofs.size()));
 
-  const NodeResolver resolver = [this](NodeId id) -> const Node& { return node(id); };
+  const NodeResolver resolver = [this](NodeId id) -> const Node& {
+    return node(id);
+  };
+
   for (const auto& load : element_loads_) {
     if (load->elementId() != element_id) {
       continue;
     }
-    const Eigen::VectorXd contribution = load->equivalentNodalLoad(target, resolver);
+    const Eigen::VectorXd contribution =
+        load->equivalentNodalLoadAt(target, resolver, time);
     if (contribution.size() != result.size()) {
-      throw std::runtime_error("Element load size does not match element DOF count");
+      throw std::runtime_error(
+          "Element load size does not match element DOF count");
     }
     result += contribution;
   }
@@ -130,10 +231,12 @@ Eigen::VectorXd Model::elementEquivalentLoad(ElementId element_id) const {
 
 ElementResponse Model::elementResponse(
     ElementId element_id,
-    const Eigen::VectorXd& global_displacement) const {
+    const Eigen::VectorXd& global_displacement,
+    double time) const {
   DofManager dm(nodes_);
   if (global_displacement.size() != static_cast<Eigen::Index>(dm.size())) {
-    throw std::invalid_argument("Global displacement size does not match model DOF count");
+    throw std::invalid_argument(
+        "Global displacement size does not match model DOF count");
   }
 
   const Element& target = element(element_id);
@@ -143,11 +246,155 @@ ElementResponse Model::elementResponse(
   for (std::size_t i = 0; i < element_dofs.size(); ++i) {
     const auto [node_id, dof] = element_dofs[i];
     element_u[static_cast<Eigen::Index>(i)] =
-        global_displacement[static_cast<Eigen::Index>(dm.equation(node_id, dof))];
+        global_displacement[
+            static_cast<Eigen::Index>(dm.equation(node_id, dof))];
   }
 
-  const NodeResolver resolver = [this](NodeId id) -> const Node& { return node(id); };
-  return target.response(element_u, elementEquivalentLoad(element_id), resolver);
+  const NodeResolver resolver = [this](NodeId id) -> const Node& {
+    return node(id);
+  };
+  return target.response(
+      element_u, elementEquivalentLoad(element_id, time), resolver);
+}
+
+std::vector<ElementLoadSamplingLocation> Model::elementLoadSampleLocations(
+    ElementId element_id) const {
+  const Element& target = element(element_id);
+  const NodeResolver resolver = [this](NodeId id) -> const Node& {
+    return node(id);
+  };
+
+  std::vector<ElementLoadSamplingLocation> locations;
+  for (const auto& load : element_loads_) {
+    if (load->elementId() != element_id) {
+      continue;
+    }
+    auto load_locations = load->responseSampleLocations(target, resolver);
+    locations.insert(
+        locations.end(), load_locations.begin(), load_locations.end());
+  }
+  return locations;
+}
+
+BeamSectionForces Model::beamSectionForces(
+    ElementId element_id,
+    double x,
+    const Eigen::VectorXd& global_displacement,
+    double time,
+    BeamSectionSide side) const {
+  const Element& target = element(element_id);
+  const auto* beam = dynamic_cast<const Beam3D*>(&target);
+  if (beam == nullptr) {
+    throw std::invalid_argument(
+        "beamSectionForces requires a Beam3D element");
+  }
+
+  const NodeResolver resolver = [this](NodeId id) -> const Node& {
+    return node(id);
+  };
+  const double l = beam->length(resolver);
+  if (x < 0.0 || x > l) {
+    throw std::invalid_argument(
+        "Beam section coordinate must lie in [0, L]");
+  }
+
+  const ElementResponse end_response =
+      elementResponse(element_id, global_displacement, time);
+
+  const Eigen::Vector3d initial_force =
+      -end_response.local_end_force.segment<3>(0);
+  const Eigen::Vector3d initial_moment =
+      -end_response.local_end_force.segment<3>(3);
+
+  BeamLoadResultant3D applied;
+  for (const auto& load : element_loads_) {
+    if (load->elementId() != element_id) {
+      continue;
+    }
+    const BeamLoadResultant3D contribution =
+        beamLoadResultantTo(*load, *beam, resolver, x, time, side);
+    applied.force += contribution.force;
+    applied.moment += contribution.moment;
+  }
+
+  const Eigen::Vector3d ex = Eigen::Vector3d::UnitX();
+  const Eigen::Vector3d section_force = initial_force - applied.force;
+  const Eigen::Vector3d section_moment =
+      initial_moment -
+      x * ex.cross(initial_force) -
+      applied.moment;
+
+  return {
+      x,
+      section_force.x(),
+      section_force.y(),
+      section_force.z(),
+      section_moment.x(),
+      section_moment.y(),
+      section_moment.z()};
+}
+
+double Model::beamNormalStressAt(
+    ElementId element_id,
+    double x,
+    double y,
+    double z,
+    const Eigen::VectorXd& global_displacement,
+    double time,
+    BeamSectionSide side) const {
+  const Element& target = element(element_id);
+  const auto* beam = dynamic_cast<const Beam3D*>(&target);
+  if (beam == nullptr) {
+    throw std::invalid_argument(
+        "beamNormalStressAt requires a Beam3D element");
+  }
+
+  const BeamSectionForces forces =
+      beamSectionForces(
+          element_id, x, global_displacement, time, side);
+  return BeamSectionStressRecovery{}.normalStressAt(
+      beam->section(), forces, y, z);
+}
+
+BeamSectionStress Model::beamStressAt(
+    ElementId element_id,
+    double x,
+    double y,
+    double z,
+    const Eigen::VectorXd& global_displacement,
+    double time,
+    BeamSectionSide side) const {
+  const Element& target = element(element_id);
+  const auto* beam = dynamic_cast<const Beam3D*>(&target);
+  if (beam == nullptr) {
+    throw std::invalid_argument("beamStressAt requires a Beam3D element");
+  }
+
+  const BeamSectionForces forces =
+      beamSectionForces(
+          element_id, x, global_displacement, time, side);
+  return BeamSectionStressRecovery{}.stressAt(
+      beam->section(), forces, y, z);
+}
+
+BeamNormalStressExtrema Model::beamNormalStressExtrema(
+    ElementId element_id,
+    double x,
+    const Eigen::VectorXd& global_displacement,
+    double time,
+    BeamSectionSide side) const {
+  const Element& target = element(element_id);
+  const auto* beam = dynamic_cast<const Beam3D*>(&target);
+  if (beam == nullptr) {
+    throw std::invalid_argument(
+        "beamNormalStressExtrema requires a Beam3D element");
+  }
+
+  const BeamSectionForces forces =
+      beamSectionForces(
+          element_id, x, global_displacement, time, side);
+  return BeamSectionStressRecovery{}.normalStressExtrema(
+      beam->section(), forces);
 }
 
 }  // namespace fem

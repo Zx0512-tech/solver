@@ -3,6 +3,8 @@
 #include "fem/elements/Beam3D.hpp"
 #include "fem/loads/BeamElementLoad3D.hpp"
 
+#include <Eigen/Geometry>
+
 #include <stdexcept>
 
 namespace fem {

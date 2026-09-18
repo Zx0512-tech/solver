@@ -2,6 +2,8 @@
 
 #include "fem/elements/Beam3D.hpp"
 
+#include <Eigen/Geometry>
+
 #include <algorithm>
 #include <array>
 #include <stdexcept>

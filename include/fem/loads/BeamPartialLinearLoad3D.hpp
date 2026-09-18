@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fem/core/ElementLoad.hpp"
+#include "fem/loads/BeamElementLoad3D.hpp"
 #include "fem/loads/BeamLoadCoordinateSystem.hpp"
 
 #include <Eigen/Core>
@@ -8,10 +8,7 @@
 namespace fem {
 
 // Linearly varying distributed load applied only on [start_from_i, end_from_i].
-// q_start and q_end are the load intensities at the two ends of that interval.
-// Equal intensities give a partial uniform load; unequal values give a partial
-// triangular/trapezoidal load.
-class BeamPartialLinearLoad3D final : public ElementLoad {
+class BeamPartialLinearLoad3D final : public BeamElementLoad3D {
  public:
   BeamPartialLinearLoad3D(
       ElementId element_id,
@@ -20,7 +17,7 @@ class BeamPartialLinearLoad3D final : public ElementLoad {
       const Eigen::Vector3d& load_per_length_start,
       const Eigen::Vector3d& load_per_length_end,
       BeamLoadCoordinateSystem coordinate_system = BeamLoadCoordinateSystem::Local)
-      : ElementLoad(element_id),
+      : BeamElementLoad3D(element_id),
         start_from_i_(start_from_i),
         end_from_i_(end_from_i),
         load_per_length_start_(load_per_length_start),
@@ -33,6 +30,12 @@ class BeamPartialLinearLoad3D final : public ElementLoad {
   Eigen::VectorXd equivalentNodalLoad(
       const Element& element,
       const NodeResolver& node) const override;
+
+  BeamLoadResultant3D localResultantTo(
+      const Beam3D& beam,
+      const NodeResolver& node,
+      double x,
+      BeamSectionSide side) const override;
 
  private:
   double start_from_i_;

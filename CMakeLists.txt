@@ -53,6 +53,7 @@ add_library(solver_core
   src/solver/LinearStaticSolver.cpp
   src/solver/ModalSolver.cpp
   src/solver/NewmarkBetaSolver.cpp
+  src/solver/SparseDofReducer.cpp
 )
 add_library(solver::core ALIAS solver_core)
 
@@ -127,4 +128,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_sparse_assembly tests/test_sparse_assembly.cpp)
   target_link_libraries(test_sparse_assembly PRIVATE solver::core)
   add_test(NAME sparse_assembly COMMAND test_sparse_assembly)
+
+  add_executable(test_sparse_solvers tests/test_sparse_solvers.cpp)
+  target_link_libraries(test_sparse_solvers PRIVATE solver::core)
+  add_test(NAME sparse_solvers COMMAND test_sparse_solvers)
 endif()

@@ -197,13 +197,37 @@ SparseMatrix K / M
 
 Duplicate triplets at shared structural DOFs are summed during assembly, so contributions from connected elements accumulate correctly without first allocating a dense global matrix.
 
-PR #9 intentionally changes **global storage/assembly only**. The current static, modal and Newmark solvers still extract their constrained/free-DOF reduced matrices into `Eigen::MatrixXd` before factorization. Sparse reduced-system factorization is deferred to the next solver migration.
+Static and transient solvers now keep their reduced free-DOF systems sparse:
+
+```text
+Sparse global K / M
+      ↓
+SparseDofReducer
+      ↓
+Sparse Kff / Mff
+      ↓
+Sparse factorization
+```
+
+`LinearStaticSolver` uses `Eigen::SimplicialLDLT` on the sparse reduced stiffness matrix.
+
+For Newmark-beta, `Kff`, `Mff`, Rayleigh damping `Cff = alpha Mff + beta Kff`, and the effective stiffness remain sparse. The effective stiffness
+
+```text
+Keff = K + a0 M + a1 C
+```
+
+is factorized once before the time-step loop and the same sparse factorization is reused for every step. The reduced mass matrix is also factorized once for the initial acceleration solve.
+
+`ModalSolver` is intentionally still dense at the reduced generalized eigenproblem stage; sparse modal eigensolving is a separate future extension.
 
 ### Analysis
+- sparse linear-static reduced-system solve with `Eigen::SimplicialLDLT`
 - linear static solution and reaction recovery
-- generalized eigenvalue modal analysis `K phi = omega^2 M phi`
-- Rayleigh damping `C = alpha M + beta K`
-- Newmark-beta transient integration for `M a + C v + K u = F(t)`
+- generalized eigenvalue modal analysis `K phi = omega^2 M phi` (dense reduced eigensolve)
+- sparse Rayleigh damping matrix `C = alpha M + beta K`
+- sparse Newmark-beta transient integration for `M a + C v + K u = F(t)`
+- one-time sparse `Keff` factorization reused across all Newmark steps
 - arbitrary nodal time-history loads
 - arbitrary time-dependent element loads evaluated at every Newmark step
 - time-aware element-force recovery, so recorder output subtracts the current equivalent element load

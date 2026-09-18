@@ -170,6 +170,30 @@ void testSparseStaticSolverOnAxialChain() {
       "sparse static axial-chain root reaction");
 }
 
+void testSparseStaticSolverRejectsRigidBodyMechanism() {
+  fem::Model model;
+  model.addNode(1, {0.0, 0.0, 0.0});
+  model.addNode(2, {2.0, 0.0, 0.0});
+
+  model.addElement<fem::Beam3D>(
+      1,
+      1,
+      2,
+      fem::LinearElasticMaterial(200.0e9, 0.3, 7850.0),
+      fem::BeamSection(0.01, 2e-5, 3e-5, 4e-5));
+
+  bool threw = false;
+  try {
+    (void)fem::LinearStaticSolver{}.solve(model);
+  } catch (const std::runtime_error&) {
+    threw = true;
+  }
+
+  require(
+      threw,
+      "sparse static solver must reject an unconstrained rigid-body mechanism");
+}
+
 void testSparseNewmarkMatchesClosedFormFirstStepForAxialSdoF() {
   constexpr double length = 2.0;
   constexpr double e = 200.0e9;
@@ -225,6 +249,7 @@ int main() {
   testSparseDofReducerKeepsSparseTypeAndValues();
   testSparseRayleighDamping();
   testSparseStaticSolverOnAxialChain();
+  testSparseStaticSolverRejectsRigidBodyMechanism();
   testSparseNewmarkMatchesClosedFormFirstStepForAxialSdoF();
   std::cout << "All sparse-solver tests passed.\n";
   return EXIT_SUCCESS;

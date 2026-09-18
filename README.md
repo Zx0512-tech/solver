@@ -21,16 +21,43 @@ A compact C++ finite-element solver focused on clear element formulations and ex
 - local deformation and end-force response recovery
 
 ### Loads and response
-- nodal forces and moments
-- uniform Beam3D line load in local x/y/z directions
-- consistent equivalent nodal loads
-- element resisting/end forces include fixed-end load effects
+- nodal forces and nodal moments
+- `BeamUniformLoad3D`: uniform line load
+- `BeamLinearLoad3D`: triangular/trapezoidal line load with independent i/j intensities
+- `BeamPointLoad3D`: concentrated force and/or moment at an arbitrary distance from node i
+- beam loads may be defined in local or global coordinates
+- consistent equivalent nodal loads based on beam interpolation functions
+- element resisting/end forces retain fixed-end effects from element loads
 - static element response recording
 - transient element-force history recording
 
 For a Beam3D, the local end-force order is:
 
 `[N_i, Vy_i, Vz_i, T_i, My_i, Mz_i, N_j, Vy_j, Vz_j, T_j, My_j, Mz_j]`
+
+Examples:
+
+```cpp
+// Uniform load in local axes.
+model.addElementLoad<fem::BeamUniformLoad3D>(
+    1, Eigen::Vector3d(0.0, -2000.0, 0.0));
+
+// Global vertical load on an arbitrarily oriented beam.
+model.addElementLoad<fem::BeamUniformLoad3D>(
+    1,
+    Eigen::Vector3d(0.0, 0.0, -5000.0),
+    fem::BeamLoadCoordinateSystem::Global);
+
+// Trapezoidal load from qi to qj.
+model.addElementLoad<fem::BeamLinearLoad3D>(
+    1,
+    Eigen::Vector3d(0.0, -1000.0, 0.0),
+    Eigen::Vector3d(0.0, -3000.0, 0.0));
+
+// Concentrated force 1.5 m from node i.
+model.addElementLoad<fem::BeamPointLoad3D>(
+    1, 1.5, Eigen::Vector3d(0.0, -10000.0, 0.0));
+```
 
 ### Analysis
 - linear static solution and reaction recovery
@@ -71,7 +98,3 @@ ctest --test-dir build --output-on-failure
 ```
 
 Eigen 3.4 is used for linear algebra.
-
-Examples:
-- `examples/cantilever.cpp`: linear static beam
-- `examples/dynamic_cantilever.cpp`: modal + Rayleigh + Newmark transient analysis

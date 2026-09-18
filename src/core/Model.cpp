@@ -230,6 +230,25 @@ ElementResponse Model::elementResponse(
       element_u, elementEquivalentLoad(element_id, time), resolver);
 }
 
+std::vector<ElementLoadSamplingLocation> Model::elementLoadSampleLocations(
+    ElementId element_id) const {
+  const Element& target = element(element_id);
+  const NodeResolver resolver = [this](NodeId id) -> const Node& {
+    return node(id);
+  };
+
+  std::vector<ElementLoadSamplingLocation> locations;
+  for (const auto& load : element_loads_) {
+    if (load->elementId() != element_id) {
+      continue;
+    }
+    auto load_locations = load->responseSampleLocations(target, resolver);
+    locations.insert(
+        locations.end(), load_locations.begin(), load_locations.end());
+  }
+  return locations;
+}
+
 BeamSectionForces Model::beamSectionForces(
     ElementId element_id,
     double x,

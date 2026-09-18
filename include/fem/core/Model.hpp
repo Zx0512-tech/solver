@@ -91,6 +91,9 @@ class Model {
       double time = 0.0,
       BeamSectionSide side = BeamSectionSide::Right) const;
 
+  std::vector<ElementLoadSamplingLocation> elementLoadSampleLocations(
+      ElementId element_id) const;
+
   const std::unordered_map<NodeId, Node>& nodes() const noexcept { return nodes_; }
 
  private:

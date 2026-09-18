@@ -37,6 +37,14 @@ class BeamPointLoad3D final : public BeamElementLoad3D {
       double x,
       BeamSectionSide side) const override;
 
+  std::vector<ElementLoadSamplingLocation> responseSampleLocations(
+      const Element& element,
+      const NodeResolver& node) const override {
+    (void)element;
+    (void)node;
+    return {{distance_from_i_, true}};
+  }
+
  private:
   double distance_from_i_;
   Eigen::Vector3d force_;

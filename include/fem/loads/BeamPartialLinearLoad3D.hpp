@@ -37,6 +37,14 @@ class BeamPartialLinearLoad3D final : public BeamElementLoad3D {
       double x,
       BeamSectionSide side) const override;
 
+  std::vector<ElementLoadSamplingLocation> responseSampleLocations(
+      const Element& element,
+      const NodeResolver& node) const override {
+    (void)element;
+    (void)node;
+    return {{start_from_i_, false}, {end_from_i_, false}};
+  }
+
  private:
   double start_from_i_;
   double end_from_i_;

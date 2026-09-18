@@ -25,6 +25,10 @@ class Beam3D final : public Element {
   std::vector<ElementDof> dofs() const override;
   Eigen::MatrixXd stiffness(const NodeResolver& node) const override;
   Eigen::MatrixXd mass(const NodeResolver& node) const override;
+  ElementResponse response(
+      const Eigen::VectorXd& element_global_displacement,
+      const Eigen::VectorXd& element_equivalent_load_global,
+      const NodeResolver& node) const override;
 
   double length(const NodeResolver& node) const;
   Matrix12d localStiffness(double length) const;

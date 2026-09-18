@@ -81,4 +81,12 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_beam_loads tests/test_beam_loads.cpp)
   target_link_libraries(test_beam_loads PRIVATE solver::core)
   add_test(NAME beam_loads COMMAND test_beam_loads)
+
+  add_executable(test_partial_beam_loads tests/test_partial_beam_loads.cpp)
+  target_link_libraries(test_partial_beam_loads PRIVATE solver::core)
+  add_test(NAME partial_beam_loads COMMAND test_partial_beam_loads)
+
+  add_executable(test_time_element_loads tests/test_time_element_loads.cpp)
+  target_link_libraries(test_time_element_loads PRIVATE solver::core)
+  add_test(NAME time_element_loads COMMAND test_time_element_loads)
 endif()

@@ -123,4 +123,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_result_recorders tests/test_result_recorders.cpp)
   target_link_libraries(test_result_recorders PRIVATE solver::core)
   add_test(NAME result_recorders COMMAND test_result_recorders)
+
+  add_executable(test_sparse_assembly tests/test_sparse_assembly.cpp)
+  target_link_libraries(test_sparse_assembly PRIVATE solver::core)
+  add_test(NAME sparse_assembly COMMAND test_sparse_assembly)
 endif()

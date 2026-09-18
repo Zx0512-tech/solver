@@ -11,6 +11,7 @@
 #include "fem/response/BeamSectionStress.hpp"
 
 #include <Eigen/Core>
+#include <Eigen/SparseCore>
 
 #include <functional>
 #include <memory>
@@ -22,8 +23,8 @@
 namespace fem {
 
 struct AssembledSystem {
-  Eigen::MatrixXd stiffness;
-  Eigen::MatrixXd mass;
+  Eigen::SparseMatrix<double> stiffness;
+  Eigen::SparseMatrix<double> mass;
   Eigen::VectorXd load;
   DofManager dofs;
 };

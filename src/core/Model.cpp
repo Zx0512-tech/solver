@@ -5,6 +5,7 @@
 #include "fem/response/BeamSectionStressRecovery.hpp"
 
 #include <Eigen/Geometry>
+#include <Eigen/SparseCore>
 
 #include <stdexcept>
 
@@ -129,8 +130,10 @@ AssembledSystem Model::assemble() const {
   DofManager dm(nodes_);
   const Eigen::Index n = static_cast<Eigen::Index>(dm.size());
 
-  Eigen::MatrixXd global_k = Eigen::MatrixXd::Zero(n, n);
-  Eigen::MatrixXd global_m = Eigen::MatrixXd::Zero(n, n);
+  std::vector<Eigen::Triplet<double>> stiffness_triplets;
+  std::vector<Eigen::Triplet<double>> mass_triplets;
+  stiffness_triplets.reserve(elements_.size() * 144U);
+  mass_triplets.reserve(elements_.size() * 144U);
 
   const NodeResolver resolver = [this](NodeId id) -> const Node& {
     return node(id);
@@ -163,11 +166,34 @@ AssembledSystem Model::assemble() const {
             element_dofs[static_cast<std::size_t>(b)];
         const Eigen::Index ib =
             static_cast<Eigen::Index>(dm.equation(node_b, dof_b));
-        global_k(ia, ib) += ke(a, b);
-        global_m(ia, ib) += me(a, b);
+
+        const double stiffness_value = ke(a, b);
+        if (stiffness_value != 0.0) {
+          stiffness_triplets.emplace_back(ia, ib, stiffness_value);
+        }
+
+        const double mass_value = me(a, b);
+        if (mass_value != 0.0) {
+          mass_triplets.emplace_back(ia, ib, mass_value);
+        }
       }
     }
   }
+
+  Eigen::SparseMatrix<double> global_k(n, n);
+  Eigen::SparseMatrix<double> global_m(n, n);
+
+  global_k.setFromTriplets(
+      stiffness_triplets.begin(), stiffness_triplets.end(),
+      [](double a, double b) { return a + b; });
+  global_m.setFromTriplets(
+      mass_triplets.begin(), mass_triplets.end(),
+      [](double a, double b) { return a + b; });
+
+  global_k.prune(0.0);
+  global_m.prune(0.0);
+  global_k.makeCompressed();
+  global_m.makeCompressed();
 
   return {
       std::move(global_k),

@@ -2,6 +2,7 @@
 
 #include <Eigen/Cholesky>
 #include <Eigen/Eigenvalues>
+#include <Eigen/SparseCore>
 
 #include <algorithm>
 #include <cmath>
@@ -27,14 +28,15 @@ std::vector<Eigen::Index> freeDofs(const Model& model, const DofManager& dofs) {
   return result;
 }
 
-Eigen::MatrixXd selectMatrix(const Eigen::MatrixXd& matrix,
+Eigen::MatrixXd selectMatrix(const Eigen::SparseMatrix<double>& matrix,
                              const std::vector<Eigen::Index>& indices) {
   const Eigen::Index n = static_cast<Eigen::Index>(indices.size());
   Eigen::MatrixXd reduced(n, n);
   for (Eigen::Index i = 0; i < n; ++i) {
     for (Eigen::Index j = 0; j < n; ++j) {
-      reduced(i, j) = matrix(indices[static_cast<std::size_t>(i)],
-                             indices[static_cast<std::size_t>(j)]);
+      reduced(i, j) = matrix.coeff(
+          indices[static_cast<std::size_t>(i)],
+          indices[static_cast<std::size_t>(j)]);
     }
   }
   return reduced;

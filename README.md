@@ -154,6 +154,14 @@ Unsupported combinations throw explicitly instead of dropping a stress contribut
 Example:
 
 ```cpp
+const double sigma_x =
+    model.beamNormalStressAt(
+        beam_id,
+        x,
+        y,
+        z,
+        result.displacement);
+
 const auto stress =
     model.beamStressAt(
         beam_id,
@@ -169,7 +177,7 @@ const auto extrema =
         result.displacement);
 ```
 
-`beamNormalStressExtrema` returns `sigma_min` / `sigma_max` and their section coordinates for rectangles and solid circles.
+`beamNormalStressAt` always recovers the axial+bending normal stress, even when the section's full shear/torsion point-stress model is not implemented. `beamNormalStressExtrema` returns `sigma_min` / `sigma_max` and their section coordinates for rectangles and solid circles.
 
 ### Analysis
 - linear static solution and reaction recovery

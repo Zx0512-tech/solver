@@ -45,6 +45,9 @@ add_library(solver_core
   src/loads/BeamUniformLoad3D.cpp
   src/loads/TimeDependentElementLoad.cpp
   src/recorder/ElementRecorder.cpp
+  src/recorder/EnvelopeRecorder.cpp
+  src/recorder/NodeRecorder.cpp
+  src/recorder/SectionRecorder.cpp
   src/response/BeamResponseSampler.cpp
   src/response/BeamSectionStressRecovery.cpp
   src/solver/LinearStaticSolver.cpp
@@ -73,6 +76,9 @@ if(SOLVER_BUILD_EXAMPLES)
 
   add_executable(beam_stress_recovery_example examples/beam_stress_recovery.cpp)
   target_link_libraries(beam_stress_recovery_example PRIVATE solver::core)
+
+  add_executable(result_envelope_example examples/result_envelope.cpp)
+  target_link_libraries(result_envelope_example PRIVATE solver::core)
 endif()
 
 if(SOLVER_BUILD_TESTS)
@@ -113,4 +119,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_section_stress tests/test_section_stress.cpp)
   target_link_libraries(test_section_stress PRIVATE solver::core)
   add_test(NAME section_stress COMMAND test_section_stress)
+
+  add_executable(test_result_recorders tests/test_result_recorders.cpp)
+  target_link_libraries(test_result_recorders PRIVATE solver::core)
+  add_test(NAME result_recorders COMMAND test_result_recorders)
 endif()

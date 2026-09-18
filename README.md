@@ -236,3 +236,52 @@ Run the section-stress example with:
 ```
 
 It reports the root-section point stress and minimum/maximum normal stress for a rectangular Beam3D.
+
+
+### Result recorders and dynamic envelopes
+
+The result layer provides three focused recorders:
+
+```cpp
+const auto node_history =
+    fem::NodeRecorder{}.record(node_id, newmark_result);
+
+const auto section_history =
+    fem::SectionRecorder{}.record(
+        model, beam_id, x, newmark_result);
+
+const auto stress_history =
+    fem::SectionRecorder{}.recordNormalStress(
+        model, beam_id, x, y, z, newmark_result);
+```
+
+`EnvelopeRecorder` returns minimum, maximum and maximum-absolute response together with the occurrence time and step:
+
+```cpp
+const auto uy_envelope =
+    fem::EnvelopeRecorder{}.record(
+        node_history,
+        fem::NodeResponseQuantity::Displacement,
+        fem::Dof::UY);
+
+const auto mz_envelope =
+    fem::EnvelopeRecorder{}.record(
+        section_history,
+        fem::BeamSectionForceComponent::Mz);
+
+const auto sigma_envelope =
+    fem::EnvelopeRecorder{}.record(stress_history);
+```
+
+Each envelope contains:
+- minimum value, time and step
+- maximum value, time and step
+- maximum absolute magnitude, signed value, time and step
+
+Run:
+
+```bash
+./build/result_envelope_example
+```
+
+to see tip-displacement, root-bending-moment and root-normal-stress envelopes from a Newmark transient analysis.

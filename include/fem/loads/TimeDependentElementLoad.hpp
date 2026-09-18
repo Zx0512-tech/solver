@@ -28,6 +28,12 @@ class TimeDependentElementLoad final : public ElementLoad {
       const NodeResolver& node,
       double time) const override;
 
+  std::vector<ElementLoadSamplingLocation> responseSampleLocations(
+      const Element& element,
+      const NodeResolver& node) const override {
+    return spatial_load_->responseSampleLocations(element, node);
+  }
+
  private:
   static ElementId requireElementId(const std::unique_ptr<ElementLoad>& load);
 

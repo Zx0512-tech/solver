@@ -37,12 +37,15 @@ add_library(solver_core
   src/core/Model.cpp
   src/dynamics/RayleighDamping.cpp
   src/elements/Beam3D.cpp
+  src/io/BeamForceCsvWriter.cpp
+  src/io/BeamForceDiagramSvgWriter.cpp
   src/loads/BeamLinearLoad3D.cpp
   src/loads/BeamPointLoad3D.cpp
   src/loads/BeamPartialLinearLoad3D.cpp
   src/loads/BeamUniformLoad3D.cpp
   src/loads/TimeDependentElementLoad.cpp
   src/recorder/ElementRecorder.cpp
+  src/response/BeamResponseSampler.cpp
   src/solver/LinearStaticSolver.cpp
   src/solver/ModalSolver.cpp
   src/solver/NewmarkBetaSolver.cpp
@@ -63,6 +66,9 @@ if(SOLVER_BUILD_EXAMPLES)
 
   add_executable(dynamic_cantilever_example examples/dynamic_cantilever.cpp)
   target_link_libraries(dynamic_cantilever_example PRIVATE solver::core)
+
+  add_executable(beam_force_diagrams_example examples/beam_force_diagrams.cpp)
+  target_link_libraries(beam_force_diagrams_example PRIVATE solver::core)
 endif()
 
 if(SOLVER_BUILD_TESTS)
@@ -95,4 +101,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_beam_section_forces tests/test_beam_section_forces.cpp)
   target_link_libraries(test_beam_section_forces PRIVATE solver::core)
   add_test(NAME beam_section_forces COMMAND test_beam_section_forces)
+
+  add_executable(test_beam_force_output tests/test_beam_force_output.cpp)
+  target_link_libraries(test_beam_force_output PRIVATE solver::core)
+  add_test(NAME beam_force_output COMMAND test_beam_force_output)
 endif()

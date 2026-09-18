@@ -118,6 +118,41 @@ void testPointLoadAddsLeftAndRightSamples() {
   near(right.forces.Vy, 0.0, 1.0e-8, "right-limit shear");
 }
 
+void testTipPointLoadPreservesLeftLimitAtBeamEnd() {
+  constexpr double l = 4.0;
+  constexpr double p = -9000.0;
+
+  fem::Model model;
+  auto& root = model.addNode(1, {0.0, 0.0, 0.0});
+  model.addNode(2, {l, 0.0, 0.0});
+  fixAll(root);
+  model.addElement<fem::Beam3D>(1, 1, 2, material(), section());
+  model.addElementLoad<fem::BeamPointLoad3D>(
+      1, l, Eigen::Vector3d(0.0, p, 0.0));
+
+  const auto result = fem::LinearStaticSolver{}.solve(model);
+  const auto samples =
+      fem::BeamResponseSampler{}.sample(model, 1, result.displacement, 3);
+
+  std::vector<const fem::BeamForceSample*> at_tip;
+  for (const auto& sample : samples) {
+    if (std::abs(sample.forces.x - l) < 1.0e-12) {
+      at_tip.push_back(&sample);
+    }
+  }
+
+  require(at_tip.size() == 2,
+          "tip point load should preserve left and right limits");
+  require(at_tip[0]->side == fem::BeamSectionSide::Left,
+          "tip point load first sample should be left limit");
+  require(at_tip[1]->side == fem::BeamSectionSide::Right,
+          "tip point load second sample should be right limit");
+  near(at_tip[0]->forces.Vy, p, 1.0e-10,
+       "tip point-load left-limit shear");
+  near(at_tip[1]->forces.Vy, 0.0, 1.0e-8,
+       "tip point-load right-limit shear");
+}
+
 void testPartialLoadBoundariesAreInsertedOnce() {
   constexpr double l = 4.0;
   constexpr double a = 0.7;
@@ -256,6 +291,7 @@ void testFileOutputCreatesCsvAndFourSvgFiles() {
 int main() {
   testUniformSamplingAndForces();
   testPointLoadAddsLeftAndRightSamples();
+  testTipPointLoadPreservesLeftLimitAtBeamEnd();
   testPartialLoadBoundariesAreInsertedOnce();
   testSamplerRejectsTooFewPoints();
   testCsvWriterIncludesSideAndAllForceComponents();

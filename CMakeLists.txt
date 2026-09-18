@@ -142,4 +142,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_v1_verification tests/test_v1_verification.cpp)
   target_link_libraries(test_v1_verification PRIVATE solver::core)
   add_test(NAME v1_verification COMMAND test_v1_verification)
+
+  add_executable(test_sparse_modal tests/test_sparse_modal.cpp)
+  target_link_libraries(test_sparse_modal PRIVATE solver::core)
+  add_test(NAME sparse_modal COMMAND test_sparse_modal)
 endif()

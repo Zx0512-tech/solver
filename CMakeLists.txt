@@ -66,6 +66,9 @@ if(SOLVER_BUILD_EXAMPLES)
 
   add_executable(dynamic_cantilever_example examples/dynamic_cantilever.cpp)
   target_link_libraries(dynamic_cantilever_example PRIVATE solver::core)
+
+  add_executable(beam_force_diagrams_example examples/beam_force_diagrams.cpp)
+  target_link_libraries(beam_force_diagrams_example PRIVATE solver::core)
 endif()
 
 if(SOLVER_BUILD_TESTS)

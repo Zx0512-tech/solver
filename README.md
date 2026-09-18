@@ -32,6 +32,11 @@ A compact C++ finite-element solver focused on clear element formulations and ex
 - element resisting/end forces retain fixed-end effects from element loads
 - static element response recording
 - transient element-force history recording
+- section-force recovery at arbitrary beam positions: `N(x), Vy(x), Vz(x), T(x), My(x), Mz(x)`
+- `BeamResponseSampler` for uniform sampling plus automatic load breakpoints
+- concentrated-load locations preserve left/right limits so force jumps are not smoothed out
+- CSV export with `x, side, N, Vy, Vz, T, My, Mz`
+- dependency-free SVG diagrams for axial force, shear, bending moment and torsion
 
 For a Beam3D, the local end-force order is:
 
@@ -85,6 +90,39 @@ model.addTimeDependentElementLoad<fem::BeamPartialLinearLoad3D>(
     Eigen::Vector3d(0.0, -3000.0, 0.0));
 ```
 
+### Beam force diagrams and CSV output
+
+```cpp
+const auto result = fem::LinearStaticSolver{}.solve(model);
+
+const auto samples =
+    fem::BeamResponseSampler{}.sample(
+        model,
+        beam_id,
+        result.displacement,
+        31);
+
+fem::BeamForceCsvWriter{}.writeFile(
+    "results/beam_1_forces.csv",
+    samples);
+
+fem::BeamForceDiagramSvgWriter{}.writeSet(
+    "results",
+    "beam_1",
+    samples);
+```
+
+The diagram writer creates:
+
+```text
+beam_1_axial.svg
+beam_1_shear.svg
+beam_1_bending.svg
+beam_1_torsion.svg
+```
+
+For 3D beams, the shear diagram contains both `Vy` and `Vz`, and the bending diagram contains both `My` and `Mz`. SVG output has no external plotting dependency and can be opened directly in a browser.
+
 ### Analysis
 - linear static solution and reaction recovery
 - generalized eigenvalue modal analysis `K phi = omega^2 M phi`
@@ -126,3 +164,11 @@ ctest --test-dir build --output-on-failure
 ```
 
 Eigen 3.4 is used for linear algebra.
+
+Run the force-diagram example with:
+
+```bash
+./build/beam_force_diagrams_example
+```
+
+It writes a CSV file and four SVG diagrams into `beam_force_output/`.

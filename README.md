@@ -1,71 +1,98 @@
 # solver
 
-A compact C++ finite-element solver focused on clear element formulations and extensible analysis architecture.
+一个基于 **C++17 + Eigen** 实现的三维梁结构有限元求解器，重点关注清晰的单元公式、可扩展的分析架构、完整的结果恢复，以及可验证的数值计算流程。
 
-## Implemented
+当前 v1.0 已形成从建模、组装、求解到后处理和验证的完整链路，支持线性静力、模态分析和 Newmark-β 瞬态动力分析。
 
-### Structural model
-- nodes, constraints and nodal loads
-- linear-elastic material and beam section
-- deterministic global DOF numbering
-- sparse global stiffness and mass assembly with `Eigen::SparseMatrix<double>`; dense global load vector
-- element-load abstraction with element-owned equivalent nodal loading
+## 已实现功能
 
-### Beam3D
-- 2-node 3D Euler-Bernoulli beam/frame element
-- 6 DOFs per node: `ux, uy, uz, rx, ry, rz`
-- axial, torsional and biaxial bending stiffness
-- consistent 12x12 mass matrix including torsional rotary inertia
-- robust local coordinate system
-- local/global transformation for stiffness, mass, loads and forces
-- local deformation and end-force response recovery
+### 结构模型
 
-### Loads and response
-- nodal forces and nodal moments
-- `BeamUniformLoad3D`: uniform line load
-- `BeamLinearLoad3D`: triangular/trapezoidal line load with independent i/j intensities
-- `BeamPointLoad3D`: concentrated force and/or moment at an arbitrary distance from node i
-- `BeamPartialLinearLoad3D`: uniform/triangular/trapezoidal line load acting only on a selected beam interval
-- `TimeDependentElementLoad`: reusable scalar time history for any spatial element load, supporting `P(t)` and `q(x,t)`
-- beam loads may be defined in local or global coordinates
-- consistent equivalent nodal loads based on beam interpolation functions
-- element resisting/end forces retain fixed-end effects from element loads
-- static element response recording
-- transient element-force history recording
-- section-force recovery at arbitrary beam positions: `N(x), Vy(x), Vz(x), T(x), My(x), Mz(x)`
-- `BeamResponseSampler` for uniform sampling plus automatic load breakpoints
-- concentrated-load locations preserve left/right limits so force jumps are not smoothed out
-- CSV export with `x, side, N, Vy, Vz, T, My, Mz`
-- dependency-free SVG diagrams for axial force, shear, bending moment and torsion
+- 节点、边界约束和节点荷载
+- 线弹性材料与梁截面
+- 确定性的全局自由度编号
+- 使用 `Eigen::SparseMatrix<double>` 组装总体刚度矩阵和质量矩阵
+- 总体荷载向量保持为稠密向量
+- 单元荷载抽象，单元负责自身等效节点荷载
 
-For a Beam3D, the local end-force order is:
+### Beam3D 三维梁单元
 
-`[N_i, Vy_i, Vz_i, T_i, My_i, Mz_i, N_j, Vy_j, Vz_j, T_j, My_j, Mz_j]`
+- 两节点三维 Euler-Bernoulli 梁/框架单元
+- 每个节点 6 个自由度：
+  `ux, uy, uz, rx, ry, rz`
+- 轴向、扭转和双向弯曲刚度
+- 12×12 一致质量矩阵
+- 包含扭转转动惯量
+- 稳健的局部坐标系构造
+- 刚度、质量、荷载和内力的局部/全局坐标转换
+- 局部变形和梁端内力恢复
 
-Examples:
+### 荷载与响应
+
+当前支持：
+
+- 节点力与节点力矩
+- `BeamUniformLoad3D`：均布线荷载
+- `BeamLinearLoad3D`：三角形/梯形线荷载
+- `BeamPointLoad3D`：梁任意位置集中力和集中力矩
+- `BeamPartialLinearLoad3D`：作用于指定梁段的局部均布/三角形/梯形荷载
+- `TimeDependentElementLoad`：将任意空间单元荷载包装为时变荷载，支持 `P(t)` 和 `q(x,t)`
+- 梁荷载可在局部坐标系或全局坐标系中定义
+- 基于梁形函数计算一致等效节点荷载
+- 梁端内力恢复保留单元荷载固定端效应
+- 静力单元响应记录
+- 动力单元内力时程记录
+- 梁任意位置截面内力恢复：
+
+```text
+N(x), Vy(x), Vz(x), T(x), My(x), Mz(x)
+```
+
+- `BeamResponseSampler`：均匀采样并自动插入荷载分界点
+- 集中荷载位置保留左右极限，避免剪力/内力跳变被平滑掉
+- CSV 输出：
+
+```text
+x, side, N, Vy, Vz, T, My, Mz
+```
+
+- 无额外绘图库依赖的 SVG 内力图：
+  - 轴力图
+  - 剪力图
+  - 弯矩图
+  - 扭矩图
+
+Beam3D 的局部梁端内力顺序为：
+
+```text
+[N_i, Vy_i, Vz_i, T_i, My_i, Mz_i,
+ N_j, Vy_j, Vz_j, T_j, My_j, Mz_j]
+```
+
+### 梁荷载示例
 
 ```cpp
-// Uniform load in local axes.
+// 局部坐标系均布荷载
 model.addElementLoad<fem::BeamUniformLoad3D>(
     1, Eigen::Vector3d(0.0, -2000.0, 0.0));
 
-// Global vertical load on an arbitrarily oriented beam.
+// 任意空间方向梁上的全局竖向荷载
 model.addElementLoad<fem::BeamUniformLoad3D>(
     1,
     Eigen::Vector3d(0.0, 0.0, -5000.0),
     fem::BeamLoadCoordinateSystem::Global);
 
-// Trapezoidal load from qi to qj.
+// 从 qi 线性变化到 qj 的梯形荷载
 model.addElementLoad<fem::BeamLinearLoad3D>(
     1,
     Eigen::Vector3d(0.0, -1000.0, 0.0),
     Eigen::Vector3d(0.0, -3000.0, 0.0));
 
-// Concentrated force 1.5 m from node i.
+// 距节点 i 为 1.5 m 的集中力
 model.addElementLoad<fem::BeamPointLoad3D>(
     1, 1.5, Eigen::Vector3d(0.0, -10000.0, 0.0));
 
-// Partial trapezoidal load acting only from x=1.0 m to x=4.0 m.
+// 仅作用于 x=1.0 m 到 x=4.0 m 的局部梯形荷载
 model.addElementLoad<fem::BeamPartialLinearLoad3D>(
     1,
     1.0,
@@ -73,14 +100,14 @@ model.addElementLoad<fem::BeamPartialLinearLoad3D>(
     Eigen::Vector3d(0.0, -1000.0, 0.0),
     Eigen::Vector3d(0.0, -3000.0, 0.0));
 
-// Time-dependent point load P(t) = P0 sin(omega t).
+// 时变集中荷载 P(t) = P0 sin(omega t)
 model.addTimeDependentElementLoad<fem::BeamPointLoad3D>(
     [omega](double t) { return std::sin(omega * t); },
     1,
     1.5,
     Eigen::Vector3d(0.0, -10000.0, 0.0));
 
-// Time-dependent partial distributed load q(x,t) = q0(x) * scale(t).
+// 时变局部分布荷载 q(x,t) = q0(x) * scale(t)
 model.addTimeDependentElementLoad<fem::BeamPartialLinearLoad3D>(
     [](double t) { return 1.0 + 0.5 * std::sin(20.0 * t); },
     1,
@@ -90,7 +117,7 @@ model.addTimeDependentElementLoad<fem::BeamPartialLinearLoad3D>(
     Eigen::Vector3d(0.0, -3000.0, 0.0));
 ```
 
-### Beam force diagrams and CSV output
+## 梁内力图与 CSV 输出
 
 ```cpp
 const auto result = fem::LinearStaticSolver{}.solve(model);
@@ -112,7 +139,7 @@ fem::BeamForceDiagramSvgWriter{}.writeSet(
     samples);
 ```
 
-The diagram writer creates:
+输出文件：
 
 ```text
 beam_1_axial.svg
@@ -121,11 +148,15 @@ beam_1_bending.svg
 beam_1_torsion.svg
 ```
 
-For 3D beams, the shear diagram contains both `Vy` and `Vz`, and the bending diagram contains both `My` and `Mz`. SVG output has no external plotting dependency and can be opened directly in a browser.
+对于三维梁：
 
-### Section geometry and stress recovery
+- 剪力图同时包含 `Vy` 和 `Vz`
+- 弯矩图同时包含 `My` 和 `Mz`
+- SVG 文件可直接使用浏览器打开
 
-The section layer keeps the original property-only API and adds geometry-aware convenience types:
+## 截面体系与截面应力恢复
+
+截面层保留原有的属性输入方式，同时提供几何截面类型：
 
 ```cpp
 fem::GeneralSection general(A, Iy, Iz, J);
@@ -133,25 +164,45 @@ fem::RectangleSection rectangle(size_y, size_z);
 fem::CircularSection circle(radius);
 ```
 
-`RectangleSection` derives `A`, `Iy`, `Iz` and an engineering Saint-Venant torsion-constant approximation from its dimensions. `CircularSection` derives the exact solid-circle properties.
+### 截面属性
 
-Normal stress is available for every section:
+`RectangleSection` 根据截面尺寸自动计算：
+
+- `A`
+- `Iy`
+- `Iz`
+- Saint-Venant 扭转常数工程近似值
+
+`CircularSection` 自动计算实心圆截面的：
+
+- `A`
+- `Iy = Iz`
+- 极惯性矩/扭转常数 `J`
+
+### 正应力恢复
+
+任意截面均支持轴力和双向弯曲正应力：
 
 ```text
 sigma_x = N/A - Mz*y/Iz + My*z/Iy
 ```
 
-For geometry-aware sections the solver also validates that the requested `(y,z)` point lies inside the section.
+对于具有明确几何信息的截面，程序还会检查请求的 `(y,z)` 点是否位于截面内部。
 
-Supported full point-stress recovery in v1.0:
+v1.0 当前支持：
 
-- `RectangleSection`: axial/biaxial-bending normal stress plus classical rectangular `Vy/Vz` transverse shear.
-- `CircularSection`: axial/biaxial-bending normal stress plus solid-circle Saint-Venant torsional shear.
-- `GeneralSection`: axial/biaxial-bending normal stress only because boundary/shear geometry is unknown.
+- `RectangleSection`
+  - 轴力 + 双向弯曲正应力
+  - 经典矩形 `Vy/Vz` 横向剪应力
+- `CircularSection`
+  - 轴力 + 双向弯曲正应力
+  - 实心圆 Saint-Venant 扭转剪应力
+- `GeneralSection`
+  - 轴力 + 双向弯曲正应力
 
-Unsupported combinations throw explicitly instead of dropping a stress contribution silently. In particular, rectangular torsional point stress and circular transverse-shear point stress are intentionally deferred.
+对于当前没有可靠几何公式支持的组合，程序会明确抛出异常，而不是静默忽略某个应力分量。
 
-Example:
+示例：
 
 ```cpp
 const double sigma_x =
@@ -177,16 +228,22 @@ const auto extrema =
         result.displacement);
 ```
 
-`beamNormalStressAt` always recovers the axial+bending normal stress, even when the section's full shear/torsion point-stress model is not implemented. `beamNormalStressExtrema` returns `sigma_min` / `sigma_max` and their section coordinates for rectangles and solid circles.
+`beamNormalStressAt` 始终可以恢复轴力和弯曲产生的正应力。
 
-### Sparse global assembly
+`beamNormalStressExtrema` 可返回矩形截面和实心圆截面的：
 
-Global structural matrices are assembled directly as compressed sparse matrices:
+- `sigma_min`
+- `sigma_max`
+- 对应截面坐标
+
+## 稀疏矩阵组装与求解
+
+总体结构矩阵直接组装为压缩稀疏矩阵：
 
 ```text
-element K_e / M_e
+单元 Ke / Me
       ↓
-global DOF mapping
+全局 DOF 映射
       ↓
 Eigen::Triplet<double>
       ↓
@@ -195,96 +252,100 @@ setFromTriplets()
 SparseMatrix K / M
 ```
 
-Duplicate triplets at shared structural DOFs are summed during assembly, so contributions from connected elements accumulate correctly without first allocating a dense global matrix.
+共享节点产生的重复 Triplet 会在组装阶段自动累加，因此不需要先创建稠密总体矩阵。
 
-Static and transient solvers now keep their reduced free-DOF systems sparse:
+### 静力稀疏求解
 
 ```text
-Sparse global K / M
+Sparse Global K
       ↓
 SparseDofReducer
       ↓
-Sparse Kff / Mff
+Sparse Kff
       ↓
-Sparse factorization
+Eigen::SimplicialLDLT
+      ↓
+Uf
 ```
 
-`LinearStaticSolver` uses `Eigen::SimplicialLDLT` on the sparse reduced stiffness matrix.
+静力平衡方程为：
 
-For Newmark-beta, `Kff`, `Mff`, Rayleigh damping `Cff = alpha Mff + beta Kff`, and the effective stiffness remain sparse. The effective stiffness
+```text
+Kff * Uf = Ff
+```
+
+求得位移后，通过：
+
+```text
+R = K U - F
+```
+
+恢复支座反力。
+
+### Newmark-β 稀疏瞬态求解
+
+动力方程：
+
+```text
+M a + C v + K u = F(t)
+```
+
+Rayleigh 阻尼：
+
+```text
+C = alpha M + beta K
+```
+
+Newmark 有效刚度：
 
 ```text
 Keff = K + a0 M + a1 C
 ```
 
-is factorized once before the time-step loop and the same sparse factorization is reused for every step. The reduced mass matrix is also factorized once for the initial acceleration solve.
+当前实现中：
 
-`ModalSolver` is intentionally still dense at the reduced generalized eigenproblem stage; sparse modal eigensolving is a separate future extension.
+- `Kff` 为稀疏矩阵
+- `Mff` 为稀疏矩阵
+- `Cff` 为稀疏矩阵
+- `Keff` 为稀疏矩阵
+- `Keff` 在时间循环外只分解一次
+- 所有时间步复用同一个稀疏分解结果
+- 质量矩阵同样只在计算初始加速度时分解一次
 
-### Analysis
-- sparse linear-static reduced-system solve with `Eigen::SimplicialLDLT`
-- linear static solution and reaction recovery
-- generalized eigenvalue modal analysis `K phi = omega^2 M phi` (dense reduced eigensolve)
-- sparse Rayleigh damping matrix `C = alpha M + beta K`
-- sparse Newmark-beta transient integration for `M a + C v + K u = F(t)`
-- one-time sparse `Keff` factorization reused across all Newmark steps
-- arbitrary nodal time-history loads
-- arbitrary time-dependent element loads evaluated at every Newmark step
-- time-aware element-force recovery, so recorder output subtracts the current equivalent element load
-- initial displacement and velocity support
+### 模态分析
 
-## Response architecture
+模态方程：
 
 ```text
-ElementLoad
-   |
-   +--> equivalent element nodal load --> global F
-   |
-Solver --> global displacement U
-                     |
-                     v
-                 Element
-                     |
-             ElementResponse
-          local deformation / forces
-                     |
-                     v
-              ElementRecorder
-           static or time history
+K phi = omega^2 M phi
 ```
 
-The element, not the recorder, owns the mechanics needed to recover its response.
+当前 v1.0 的总体 `K/M` 已采用稀疏存储，但约化后的广义特征值问题仍使用 Eigen 的稠密特征值求解器。
 
-## Build
+## 分析能力
 
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-```
+- 线性静力分析
+- 支座反力恢复
+- 广义特征值模态分析
+- Rayleigh 阻尼
+- Newmark-β 瞬态动力分析
+- 任意节点时变荷载
+- 任意单元时变荷载
+- 初始位移和初始速度
+- 时间相关梁端内力恢复
+- 节点、截面力和应力时程记录
+- 动力响应包络提取
 
-Eigen 3.4 is used for linear algebra.
+## 结果记录与动力包络
 
-Run the force-diagram example with:
+结果层提供：
 
-```bash
-./build/beam_force_diagrams_example
-```
+- `ElementRecorder`
+- `NodeRecorder`
+- `SectionRecorder`
+- `EnvelopeRecorder`
 
-It writes a CSV file and four SVG diagrams into `beam_force_output/`.
-
-Run the section-stress example with:
-
-```bash
-./build/beam_stress_recovery_example
-```
-
-It reports the root-section point stress and minimum/maximum normal stress for a rectangular Beam3D.
-
-
-### Result recorders and dynamic envelopes
-
-The result layer provides three focused recorders:
+示例：
 
 ```cpp
 const auto node_history =
@@ -299,7 +360,7 @@ const auto stress_history =
         model, beam_id, x, y, z, newmark_result);
 ```
 
-`EnvelopeRecorder` returns minimum, maximum and maximum-absolute response together with the occurrence time and step:
+动力包络：
 
 ```cpp
 const auto uy_envelope =
@@ -317,31 +378,97 @@ const auto sigma_envelope =
     fem::EnvelopeRecorder{}.record(stress_history);
 ```
 
-Each envelope contains:
-- minimum value, time and step
-- maximum value, time and step
-- maximum absolute magnitude, signed value, time and step
+每个包络包含：
 
-Run:
+- 最小值、发生时间和步号
+- 最大值、发生时间和步号
+- 最大绝对值
+- 最大绝对值对应的带符号原值
+- 发生时间和步号
+
+## 响应架构
+
+```text
+ElementLoad
+   │
+   ├──> 等效节点荷载 ──> 全局 F
+   │
+Solver ──> 全局位移 U
+                     │
+                     ▼
+                  Element
+                     │
+                     ▼
+              ElementResponse
+           局部变形 / 梁端内力
+                     │
+                     ▼
+                 Recorder
+             静力 / 动力时程
+```
+
+基本设计原则是：
+
+> 单元负责自身力学行为，Solver 负责总体方程求解，Recorder 只负责结果访问和整理，不重复实现单元力学。
+
+## 构建与测试
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+项目使用 Eigen 3.4 进行线性代数计算。
+
+### 示例程序
+
+梁内力图：
+
+```bash
+./build/beam_force_diagrams_example
+```
+
+截面应力恢复：
+
+```bash
+./build/beam_stress_recovery_example
+```
+
+动力包络：
 
 ```bash
 ./build/result_envelope_example
 ```
 
-to see tip-displacement, root-bending-moment and root-normal-stress envelopes from a Newmark transient analysis.
+## v1.0 验证体系
 
-
-## v1.0 verification and performance
-
-Release-level verification is provided by:
+发布级端到端验证：
 
 ```bash
 ./build/test_v1_verification
 ```
 
-It checks complete static, modal, transient, section-force, stress and recorder/envelope paths against analytical results.
+Verification Suite 使用结构力学解析解检查：
 
-Performance/scaling measurements are provided by:
+- 三维悬臂梁组合静力响应
+- 支座反力平衡
+- 均布荷载挠度和转角
+- 梁任意位置剪力和弯矩
+- Euler-Bernoulli 悬臂梁一阶频率
+- Newmark 自由振动
+- Rayleigh 阻尼目标值
+- 截面正应力
+- Recorder / Envelope 完整结果链路
+
+当前完整 CI 包含 13 组 CTest，并额外运行 v1.0 Verification Suite 和性能基准测试。
+
+详细说明：
+
+- `docs/v1-verification.md`
+- `docs/performance-benchmark.md`
+
+## 性能基准测试
 
 ```bash
 ./build/solver_benchmark \
@@ -351,8 +478,25 @@ Performance/scaling measurements are provided by:
   --csv benchmark.csv
 ```
 
-The benchmark reports sparse matrix nonzero counts, fill ratio, approximate sparse-vs-dense K storage, assembly time, end-to-end static time and end-to-end Newmark time.
+Benchmark 输出：
 
-See:
-- `docs/v1-verification.md`
-- `docs/performance-benchmark.md`
+- 单元数量
+- 全局 DOF 数
+- 自由 DOF 数
+- K/M 非零元数量
+- 稀疏率
+- 稀疏 K 近似存储量
+- 等效稠密 K 存储量
+- 稀疏/稠密存储比
+- 组装耗时
+- 静力总耗时
+- Newmark 总耗时
+- 静力解析解相对误差
+
+CI 会自动上传 `benchmark.csv` 作为构建产物。
+
+## 文档
+
+- `docs/architecture.md`：求解器架构
+- `docs/v1-verification.md`：v1.0 端到端验证
+- `docs/performance-benchmark.md`：性能基准测试

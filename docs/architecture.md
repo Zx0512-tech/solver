@@ -1,45 +1,313 @@
-# Architecture
+# 求解器架构
 
-The solver separates model data, element formulation, DOF numbering, assembly and solution. The design is conceptually influenced by OpenSees (Domain/Node/Element), deal.II (separate DOF management), and the local-element/global-assembly split used by MFEM and CalculiX. No upstream implementation is copied.
+本项目采用分层结构，将模型数据、单元力学、自由度编号、总体组装、数值求解和结果后处理分离。
 
-## Current flow
+设计思想参考了 OpenSees 的 Domain/Node/Element 分层、deal.II 的独立 DOF 管理，以及 MFEM、CalculiX 中“单元局部计算 + 总体组装”的有限元组织方式，但未复制上述项目的实现代码。
+
+## 总体计算流程
 
 ```text
 Node + Material + Section
-          |
-        Beam3D
-   local 12x12 K
-          |
- coordinate transform
-          |
-  global element K
-          |
-   Model::assemble
-          |
-     DofManager
-          |
-      global K,F
-          |
- LinearStaticSolver
-          |
- displacement + reaction
+          │
+          ▼
+       Beam3D
+   局部 Ke / Me
+          │
+          ▼
+      坐标变换
+          │
+          ▼
+   全局单元 Ke / Me
+          │
+          ▼
+    Model::assemble
+          │
+          ▼
+      DofManager
+          │
+          ▼
+ Sparse Global K / M
+          │
+          ├───────────────┐
+          ▼               ▼
+LinearStaticSolver    ModalSolver
+          │               │
+          │          Dense reduced
+          │          eigenproblem
+          │
+          ▼
+NewmarkBetaSolver
+          │
+          ▼
+   U / V / A / Reaction
+          │
+          ▼
+Element / Section Response
+          │
+          ▼
+       Recorder
+          │
+          ▼
+       Envelope
 ```
 
-`Beam3D` is a two-node 3D Euler-Bernoulli frame element with six DOFs per node: `[ux, uy, uz, rx, ry, rz]`. It includes axial extension, Saint-Venant torsion and bending about both local section axes. The local x axis is node i -> node j; a local-y hint controls section orientation. Global stiffness is `K_global = T^T K_local T`.
+## 核心模块
 
-## Next extensions
+### 1. Model
 
-1. Consistent/lumped mass matrices and global mass assembly.
-2. Timoshenko shear deformation as a separate formulation.
-3. Distributed element loads and equivalent nodal loads.
-4. Sparse matrices and sparse direct/iterative solvers.
-5. Modal analysis and Newmark-beta transient integration.
-6. Geometric stiffness/corotational transformation.
-7. Local end-force, section-force and stress recovery.
+`Model` 负责保存：
 
-## Reference projects
+- 节点
+- 单元
+- 节点荷载
+- 单元荷载
+- 时变单元荷载
 
-- https://github.com/OpenSees/OpenSees
-- https://github.com/dealii/dealii
-- https://github.com/mfem/mfem
-- http://www.calculix.de/
+同时负责总体：
+
+- 刚度矩阵 K
+- 质量矩阵 M
+- 荷载向量 F
+
+的组装。
+
+K/M 采用 `Eigen::SparseMatrix<double>`。
+
+## 2. DofManager
+
+`DofManager` 负责：
+
+```text
+(NodeId, Dof) -> global equation number
+```
+
+节点 ID 不要求连续，因此不能简单采用：
+
+```text
+equation = node_id * 6 + offset
+```
+
+独立 DOF 映射可以保证 Model、Solver、Recorder 使用同一套全局编号。
+
+## 3. Element / Beam3D
+
+`Element` 负责定义单元级接口。
+
+`Beam3D` 是当前主要单元类型：
+
+- 两节点
+- 每节点 6 DOF
+- 12×12 局部刚度矩阵
+- 12×12 一致质量矩阵
+- 轴向
+- Saint-Venant 扭转
+- 双向 Euler-Bernoulli 弯曲
+
+局部坐标 x 轴由：
+
+```text
+node i -> node j
+```
+
+确定。
+
+刚度矩阵通过：
+
+```text
+K_global = T^T K_local T
+```
+
+转换到全局坐标系。
+
+## 4. ElementLoad
+
+单元荷载独立于单元本体，用于描述：
+
+- 均布荷载
+- 线性分布荷载
+- 局部分布荷载
+- 任意位置集中力/力矩
+- 时变单元荷载
+
+连续荷载通过形函数转换为一致等效节点荷载。
+
+时变荷载采用空间荷载 + 标量时间函数的组合：
+
+```text
+f(x,t) = scale(t) * f_spatial(x)
+```
+
+## 5. 稀疏总体组装
+
+单元矩阵仍使用小型稠密矩阵。
+
+总体组装采用：
+
+```text
+Element Ke / Me
+     ↓
+DOF mapping
+     ↓
+Eigen::Triplet
+     ↓
+setFromTriplets
+     ↓
+Sparse Global K / M
+```
+
+共享节点产生的重复矩阵项自动累加。
+
+## 6. LinearStaticSolver
+
+静力方程：
+
+```text
+K U = F
+```
+
+约束后求解：
+
+```text
+Kff Uf = Ff
+```
+
+`SparseDofReducer` 从总体稀疏矩阵中直接提取稀疏约化矩阵。
+
+求解器使用：
+
+```text
+Eigen::SimplicialLDLT
+```
+
+支座反力通过：
+
+```text
+R = K U - F
+```
+
+恢复。
+
+## 7. ModalSolver
+
+模态分析求解：
+
+```text
+K phi = omega^2 M phi
+```
+
+总体 K/M 保持稀疏。
+
+当前 v1.0 在提取自由 DOF 后，将约化 Kff/Mff 转为稠密矩阵，再使用广义自伴特征值求解器。
+
+## 8. NewmarkBetaSolver
+
+动力平衡方程：
+
+```text
+M a + C v + K u = F(t)
+```
+
+Rayleigh 阻尼：
+
+```text
+C = alpha M + beta K
+```
+
+Newmark 有效刚度：
+
+```text
+Keff = K + a0 M + a1 C
+```
+
+对于当前线性时不变系统，`Keff` 在整个时程中保持不变，因此：
+
+1. 在时间循环前构造 `Keff`
+2. 使用 `SimplicialLDLT` 分解一次
+3. 每个时间步只更新有效荷载
+4. 重复使用同一分解结果求解
+
+## 9. 响应恢复
+
+梁端力恢复采用：
+
+```text
+u_local = T u_global
+
+f_local = K_local u_local - f_eq_local
+```
+
+对于梁任意位置的截面内力，不使用端力简单插值，而是根据真实荷载分布做截面平衡，得到：
+
+```text
+N(x)
+Vy(x)
+Vz(x)
+T(x)
+My(x)
+Mz(x)
+```
+
+集中荷载位置使用 Left/Right 两侧极限保存内力跳变。
+
+## 10. 截面应力
+
+当前支持：
+
+```text
+sigma_x = N/A - Mz*y/Iz + My*z/Iy
+```
+
+并根据具体截面类型提供部分剪切/扭转应力模型。
+
+## 11. Recorder
+
+结果访问层包括：
+
+- `ElementRecorder`
+- `NodeRecorder`
+- `SectionRecorder`
+- `EnvelopeRecorder`
+
+Solver 只负责求解全局状态，Recorder 负责将全局结果转换为工程上关心的节点、截面、应力和包络结果。
+
+## 验证体系
+
+项目使用三层验证：
+
+### 单元测试
+
+验证局部数学实现，例如：
+
+- Beam3D 刚度/质量
+- 荷载等效
+- 坐标转换
+- SparseDofReducer
+- 应力公式
+
+### 回归测试
+
+防止已修复问题再次出现，例如：
+
+- 集中荷载左右极限
+- 单元荷载固定端力
+- 非支持应力分量显式报错
+- 稀疏求解奇异系统检测
+
+### v1.0 Verification Suite
+
+使用解析解检查完整计算链，包括：
+
+- 静力
+- 均布荷载
+- 模态
+- Newmark
+- Rayleigh 阻尼
+- 截面应力
+- Recorder / Envelope
+
+## 参考项目
+
+- OpenSees: https://github.com/OpenSees/OpenSees
+- deal.II: https://github.com/dealii/dealii
+- MFEM: https://github.com/mfem/mfem
+- CalculiX: http://www.calculix.de/

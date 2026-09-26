@@ -90,6 +90,14 @@ equation = node_id * 6 + offset
 
 独立 DOF 映射可以保证 Model、Solver、Recorder 使用同一套全局编号。
 
+`DofManager` 还提供：
+
+- `equations(element_dofs)`：按输入顺序将单元 DOF 批量映射到总体 equation；不排序、不去重
+- `freeEquations()`：当前分析快照中的自由 equation
+- `constrainedEquations()`：当前分析快照中的约束 equation
+
+节点 ID 可以不连续，也可以按任意顺序创建。DofManager 会先按 NodeId 建立确定性的连续 equation 编号。free/constrained 集合是 DofManager 构造时的约束状态快照；每次 `Model::assemble()` 都重新构造 DofManager，因此修改节点约束后需要重新组装/求解，不维护自动监听或增量同步。
+
 ## 3. Element / Beam3D
 
 `Element` 负责定义单元级接口。

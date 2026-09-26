@@ -22,6 +22,10 @@ class Element {
 
   ElementId id() const noexcept { return id_; }
 
+  // Topological connectivity is intentionally separate from the element DOF
+  // ordering. Model uses nodeIds() for insertion-time connectivity validation,
+  // while dofs() defines the row/column ordering of element matrices.
+  virtual std::vector<NodeId> nodeIds() const = 0;
   virtual std::vector<ElementDof> dofs() const = 0;
   virtual Eigen::MatrixXd stiffness(const NodeResolver& node) const = 0;
   virtual Eigen::MatrixXd mass(const NodeResolver& node) const = 0;

@@ -12,28 +12,6 @@
 namespace fem {
 namespace {
 
-std::vector<Eigen::Index> freeDofs(
-    const Model& model,
-    const DofManager& dofs) {
-  std::vector<Eigen::Index> result;
-  result.reserve(dofs.size());
-
-  for (const NodeId node_id : dofs.nodeOrder()) {
-    const Node& node = model.node(node_id);
-    for (std::size_t offset = 0;
-         offset < kDofsPerFrameNode;
-         ++offset) {
-      const Dof dof = dofFromOffset(offset);
-      if (!node.isFixed(dof)) {
-        result.push_back(
-            static_cast<Eigen::Index>(
-                dofs.equation(node_id, dof)));
-      }
-    }
-  }
-  return result;
-}
-
 Eigen::VectorXd initialVector(
     const Eigen::VectorXd& supplied,
     Eigen::Index full_size,
@@ -95,7 +73,7 @@ NewmarkResult NewmarkBetaSolver::solve(
   }
 
   AssembledSystem system = model.assemble();
-  const auto free = freeDofs(model, system.dofs);
+  const auto& free = system.dofs.freeEquations();
   if (free.empty()) {
     throw std::runtime_error(
         "Model has no free degrees of freedom");

@@ -30,6 +30,10 @@ Beam3D::Beam3D(ElementId id,
   }
 }
 
+std::vector<NodeId> Beam3D::nodeIds() const {
+  return {node_i_, node_j_};
+}
+
 std::vector<ElementDof> Beam3D::dofs() const {
   std::vector<ElementDof> result;
   result.reserve(12);

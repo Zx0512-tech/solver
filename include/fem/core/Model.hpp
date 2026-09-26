@@ -16,6 +16,7 @@
 #include <functional>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -40,6 +41,18 @@ class Model {
     if (elements_.count(id) != 0U) {
       throw std::invalid_argument("Duplicate element id");
     }
+
+    // Validate connectivity before mutating the model. This makes element
+    // insertion fail fast and guarantees that a failed insertion leaves no
+    // partially registered element behind.
+    for (const NodeId node_id : element->nodeIds()) {
+      if (nodes_.count(node_id) == 0U) {
+        throw std::invalid_argument(
+            "Element " + std::to_string(id) +
+            " references missing node " + std::to_string(node_id));
+      }
+    }
+
     ElementType& ref = *element;
     elements_.emplace(id, std::move(element));
     return ref;

@@ -162,4 +162,8 @@ if(SOLVER_BUILD_TESTS)
   add_executable(test_sparse_modal tests/test_sparse_modal.cpp)
   target_link_libraries(test_sparse_modal PRIVATE solver::core)
   add_test(NAME sparse_modal COMMAND test_sparse_modal)
+
+  add_executable(test_model_integrity tests/test_model_integrity.cpp)
+  target_link_libraries(test_model_integrity PRIVATE solver::core)
+  add_test(NAME model_integrity COMMAND test_model_integrity)
 endif()

@@ -105,6 +105,7 @@ Eigen::VectorXd Model::loadVector(double time) const {
   for (const auto& load : element_loads_) {
     const Element& target = element(load->elementId());
     const auto element_dofs = target.dofs();
+    const auto equations = dm.equations(element_dofs);
     const Eigen::VectorXd fe =
         load->equivalentNodalLoadAt(target, resolver, time);
     const Eigen::Index ndof = static_cast<Eigen::Index>(element_dofs.size());
@@ -115,10 +116,8 @@ Eigen::VectorXd Model::loadVector(double time) const {
     }
 
     for (Eigen::Index a = 0; a < ndof; ++a) {
-      const auto [node_a, dof_a] =
-          element_dofs[static_cast<std::size_t>(a)];
       const Eigen::Index ia =
-          static_cast<Eigen::Index>(dm.equation(node_a, dof_a));
+          equations[static_cast<std::size_t>(a)];
       global_f[ia] += fe[a];
     }
   }
@@ -142,6 +141,7 @@ AssembledSystem Model::assemble() const {
   for (const auto& [element_id, element_ptr] : elements_) {
     (void)element_id;
     const auto element_dofs = element_ptr->dofs();
+    const auto equations = dm.equations(element_dofs);
     const Eigen::MatrixXd ke = element_ptr->stiffness(resolver);
     const Eigen::MatrixXd me = element_ptr->mass(resolver);
     const Eigen::Index ndof = static_cast<Eigen::Index>(element_dofs.size());
@@ -156,16 +156,12 @@ AssembledSystem Model::assemble() const {
     }
 
     for (Eigen::Index a = 0; a < ndof; ++a) {
-      const auto [node_a, dof_a] =
-          element_dofs[static_cast<std::size_t>(a)];
       const Eigen::Index ia =
-          static_cast<Eigen::Index>(dm.equation(node_a, dof_a));
+          equations[static_cast<std::size_t>(a)];
 
       for (Eigen::Index b = 0; b < ndof; ++b) {
-        const auto [node_b, dof_b] =
-            element_dofs[static_cast<std::size_t>(b)];
         const Eigen::Index ib =
-            static_cast<Eigen::Index>(dm.equation(node_b, dof_b));
+            equations[static_cast<std::size_t>(b)];
 
         const double stiffness_value = ke(a, b);
         if (stiffness_value != 0.0) {
@@ -241,13 +237,12 @@ ElementResponse Model::elementResponse(
 
   const Element& target = element(element_id);
   const auto element_dofs = target.dofs();
+  const auto equations = dm.equations(element_dofs);
   Eigen::VectorXd element_u(static_cast<Eigen::Index>(element_dofs.size()));
 
   for (std::size_t i = 0; i < element_dofs.size(); ++i) {
-    const auto [node_id, dof] = element_dofs[i];
     element_u[static_cast<Eigen::Index>(i)] =
-        global_displacement[
-            static_cast<Eigen::Index>(dm.equation(node_id, dof))];
+        global_displacement[equations[i]];
   }
 
   const NodeResolver resolver = [this](NodeId id) -> const Node& {

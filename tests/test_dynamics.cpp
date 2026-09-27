@@ -76,6 +76,62 @@ void testConsistentMass() {
              rho * (iy + iz) * length,
              1.0e-12,
              "torsional rotary inertia");
+
+  const double total_mass = rho * area * length;
+  const double radius_z_squared = iz / area;
+  const double az =
+      13.0 / 35.0 +
+      6.0 / 5.0 * radius_z_squared / (length * length);
+  const double cz =
+      11.0 * length / 210.0 +
+      radius_z_squared / (10.0 * length);
+  const double dz =
+      13.0 * length / 420.0 -
+      radius_z_squared / (10.0 * length);
+  const double ez =
+      length * length / 105.0 +
+      2.0 * radius_z_squared / 15.0;
+
+  expectNear(m(1, 1), total_mass * az, 1.0e-12,
+             "local-y bending translational mass includes Iz rotary inertia");
+  expectNear(m(1, 5), total_mass * cz, 1.0e-12,
+             "local-y bending translation-rotation coupling includes Iz");
+  expectNear(m(1, 11), -total_mass * dz, 1.0e-12,
+             "local-y opposite-end coupling uses rotary-inertia correction");
+  expectNear(m(5, 5), total_mass * ez, 1.0e-12,
+             "local-y bending rotational mass includes Iz");
+
+  const double radius_y_squared = iy / area;
+  const double ay =
+      13.0 / 35.0 +
+      6.0 / 5.0 * radius_y_squared / (length * length);
+  const double cy =
+      11.0 * length / 210.0 +
+      radius_y_squared / (10.0 * length);
+  expectNear(m(2, 2), total_mass * ay, 1.0e-12,
+             "local-z bending translational mass includes Iy rotary inertia");
+  expectNear(m(2, 4), -total_mass * cy, 1.0e-12,
+             "local-z bending coupling follows Beam3D sign convention");
+
+  Eigen::Matrix<double, 12, 1> rigid_rz = Eigen::Matrix<double, 12, 1>::Zero();
+  rigid_rz[5] = 1.0;
+  rigid_rz[7] = length;
+  rigid_rz[11] = 1.0;
+  expectNear((rigid_rz.transpose() * m * rigid_rz)(0, 0),
+             rho * area * length * length * length / 3.0 +
+                 rho * iz * length,
+             1.0e-12,
+             "rigid rotation about local z includes translational and rotary inertia");
+
+  Eigen::Matrix<double, 12, 1> rigid_ry = Eigen::Matrix<double, 12, 1>::Zero();
+  rigid_ry[4] = 1.0;
+  rigid_ry[8] = -length;
+  rigid_ry[10] = 1.0;
+  expectNear((rigid_ry.transpose() * m * rigid_ry)(0, 0),
+             rho * area * length * length * length / 3.0 +
+                 rho * iy * length,
+             1.0e-12,
+             "rigid rotation about local y includes translational and rotary inertia");
 }
 
 void testRayleighTargets() {

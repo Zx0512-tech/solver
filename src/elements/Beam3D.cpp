@@ -177,31 +177,69 @@ Beam3D::Matrix12d Beam3D::localMass(double l) const {
   m(9, 3) = torsion;
   m(9, 9) = 2.0 * torsion;
 
-  const double bending = total_mass / 420.0;
+  // Consistent bending mass including cross-section rotary inertia.
+  //
+  // The Hermite interpolation contribution alone gives the familiar
+  // 156/22L/54/... Euler-Bernoulli matrix.  For dynamics, a cross section
+  // also has kinetic energy from rotation about the local y/z bending axes.
+  // With zero shear-deformation parameter (phi = 0), integrating
+  // rho * I * theta_dot^2 adds the radius-of-gyration corrections below.
+  // This is the zero-shear limit of the Yokoyama/BEAM4 consistent mass
+  // formulation used with LUMPM,OFF.
+  const auto bending_coefficients =
+      [l, l2](double radius_squared) {
+        const double normalized_radius =
+            radius_squared / l2;
 
+        struct Coefficients {
+          double a;
+          double b;
+          double c;
+          double d;
+          double e;
+          double f;
+        };
+
+        return Coefficients{
+            13.0 / 35.0 + 6.0 / 5.0 * normalized_radius,
+            9.0 / 70.0 - 6.0 / 5.0 * normalized_radius,
+            11.0 * l / 210.0 + radius_squared / (10.0 * l),
+            13.0 * l / 420.0 - radius_squared / (10.0 * l),
+            l2 / 105.0 + 2.0 * radius_squared / 15.0,
+            -l2 / 140.0 - radius_squared / 30.0};
+      };
+
+  // Local-y translation bends about local z, so the rotary-inertia
+  // correction uses Iz/A.
+  const auto z_mass =
+      bending_coefficients(section_.iz / area);
   const int z_dofs[4] = {1, 5, 7, 11};
   const double z_values[4][4] = {
-      {156.0, 22.0 * l, 54.0, -13.0 * l},
-      {22.0 * l, 4.0 * l2, 13.0 * l, -3.0 * l2},
-      {54.0, 13.0 * l, 156.0, -22.0 * l},
-      {-13.0 * l, -3.0 * l2, -22.0 * l, 4.0 * l2},
+      {z_mass.a, z_mass.c, z_mass.b, -z_mass.d},
+      {z_mass.c, z_mass.e, z_mass.d, z_mass.f},
+      {z_mass.b, z_mass.d, z_mass.a, -z_mass.c},
+      {-z_mass.d, z_mass.f, -z_mass.c, z_mass.e},
   };
   for (int r = 0; r < 4; ++r) {
     for (int c = 0; c < 4; ++c) {
-      m(z_dofs[r], z_dofs[c]) = bending * z_values[r][c];
+      m(z_dofs[r], z_dofs[c]) = total_mass * z_values[r][c];
     }
   }
 
+  // Local-z translation bends about local y.  The sign pattern follows
+  // theta_y = -dw/dx for the Beam3D local-DOF convention.
+  const auto y_mass =
+      bending_coefficients(section_.iy / area);
   const int y_dofs[4] = {2, 4, 8, 10};
   const double y_values[4][4] = {
-      {156.0, -22.0 * l, 54.0, 13.0 * l},
-      {-22.0 * l, 4.0 * l2, -13.0 * l, -3.0 * l2},
-      {54.0, -13.0 * l, 156.0, 22.0 * l},
-      {13.0 * l, -3.0 * l2, 22.0 * l, 4.0 * l2},
+      {y_mass.a, -y_mass.c, y_mass.b, y_mass.d},
+      {-y_mass.c, y_mass.e, -y_mass.d, y_mass.f},
+      {y_mass.b, -y_mass.d, y_mass.a, y_mass.c},
+      {y_mass.d, y_mass.f, y_mass.c, y_mass.e},
   };
   for (int r = 0; r < 4; ++r) {
     for (int c = 0; c < 4; ++c) {
-      m(y_dofs[r], y_dofs[c]) = bending * y_values[r][c];
+      m(y_dofs[r], y_dofs[c]) = total_mass * y_values[r][c];
     }
   }
 

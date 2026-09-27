@@ -111,6 +111,7 @@ equation = node_id * 6 + offset
 - 轴向
 - Saint-Venant 扭转
 - 双向 Euler-Bernoulli 弯曲
+- 弯曲质量矩阵包含截面绕局部 y/z 轴的 rotary inertia 修正；对应 BEAM4 `LUMPM,OFF` 在零剪切变形参数下的质量公式
 
 局部坐标 x 轴由：
 
@@ -127,6 +128,8 @@ K_global = T^T K_local T
 ```
 
 转换到全局坐标系。
+
+当前 Beam3D 的刚度仍采用 Euler-Bernoulli 假设，不包含剪切变形；动力质量矩阵在经典 Hermite 一致质量基础上进一步计入截面弯曲转动惯量，因此与仅使用 `rho*A*L/420` 的简化质量矩阵不同。
 
 ## 4. ElementLoad
 

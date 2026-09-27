@@ -216,7 +216,10 @@ void verifyModalFrequency(VerificationState& state) {
   constexpr double rho = 7850.0;
   constexpr double area = 0.02;
   constexpr double iz = 8.0e-5;
-  constexpr double length = 4.0;
+  // Keep this analytical Euler-Bernoulli comparison in the slender-beam
+  // limit. Beam3D's consistent mass also includes cross-section rotary
+  // inertia, whose influence vanishes as I/(A L^2) -> 0.
+  constexpr double length = 40.0;
   constexpr int elements = 8;
 
   fem::Model model;
